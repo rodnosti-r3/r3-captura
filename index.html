@@ -4,16 +4,47 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Captura Diaria — Farmacias R3</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
+
+    /* ── LOGIN ── */
+    #loginScreen {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .login-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 16px;
+      padding: 2.5rem 2rem; width: 100%; max-width: 380px;
+    }
+    .login-logo { text-align: center; margin-bottom: 2rem; }
+    .login-logo h1 { font-size: 20px; font-weight: 600; color: #1a1a1a; }
+    .login-logo p { font-size: 13px; color: #888; margin-top: 4px; }
+    .field-group { margin-bottom: 1rem; }
+    .field-group label { display: block; font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+    .field-group input { width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; color: #1a1a1a; background: #fff; outline: none; transition: border-color .15s; font-family: inherit; }
+    .field-group input:focus { border-color: #0C447C; }
+    .login-btn { width: 100%; padding: 11px; background: #0C447C; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 0.5rem; transition: background .15s; font-family: inherit; }
+    .login-btn:hover { background: #185FA5; }
+    .login-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .login-err { font-size: 13px; color: #A32D2D; background: #FCEBEB; border-radius: 6px; padding: 8px 12px; margin-top: 12px; display: none; }
+
+    /* ── APP ── */
+    #appScreen { display: none; }
+    .topbar {
+      background: #fff; border-bottom: 1px solid #e8e8e8;
+      padding: 12px 1.5rem; display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-title { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+    .topbar-user { display: flex; align-items: center; gap: 10px; }
+    .user-badge { font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+    .badge-mad { background: #E6F1FB; color: #0C447C; }
+    .badge-con { background: #E1F5EE; color: #085041; }
+    .logout-btn { font-size: 12px; color: #888; background: none; border: 1px solid #e0e0e0; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: inherit; }
+    .logout-btn:hover { background: #f5f5f5; }
+
     .app { max-width: 580px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
-    h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
-    .subtitle { font-size: 14px; color: #666; margin-bottom: 2rem; }
-    .sucursal-row { display: flex; gap: 8px; margin-bottom: 1.5rem; }
-    .stab { padding: 6px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #d0d0d0; background: transparent; color: #666; transition: all .15s; }
-    .stab.blue { background: #E6F1FB; color: #0C447C; border-color: #B5D4F4; }
-    .stab.teal { background: #E1F5EE; color: #085041; border-color: #9FE1CB; }
     .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1.25rem; margin-bottom: 14px; }
     .clabel { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 12px; }
     .drop { border: 1.5px dashed #ccc; border-radius: 8px; padding: 1.5rem 1rem; text-align: center; cursor: pointer; transition: all .15s; position: relative; }
@@ -31,7 +62,7 @@
     .field-lbl { font-size: 13px; color: #666; width: 115px; flex-shrink: 0; }
     .field-prefix { font-size: 13px; color: #bbb; }
     .field-static { flex: 1; font-size: 15px; font-weight: 600; text-align: right; color: #0C447C; }
-    .field-row.ref-row { background: #f7f9ff; margin: 0 -1.25rem; padding: 10px 1.25rem; border-radius: 0; border-bottom: 1px solid #e8e8e8; }
+    .field-row.ref-row { background: #f7f9ff; margin: 0 -1.25rem; padding: 10px 1.25rem; border-bottom: 1px solid #e8e8e8; }
     .ref-lbl { font-size: 13px; font-weight: 600; color: #333; width: 115px; flex-shrink: 0; }
     input[type=number] { flex: 1; border: none; background: transparent; font-size: 14px; font-weight: 600; color: #1a1a1a; text-align: right; outline: none; font-family: inherit; }
     input[type=number]::placeholder { color: #ccc; font-weight: 400; }
@@ -45,7 +76,7 @@
     .diff-lbl { font-weight: 600; }
     .diff-val { font-weight: 600; font-size: 14px; }
     .actions { display: flex; gap: 10px; margin-top: 1.25rem; flex-wrap: wrap; }
-    .btn { padding: 10px 22px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid #d0d0d0; background: transparent; color: #333; cursor: pointer; transition: all .15s; }
+    .btn { padding: 10px 22px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid #d0d0d0; background: transparent; color: #333; cursor: pointer; transition: all .15s; font-family: inherit; }
     .btn:hover { background: #f5f5f5; }
     .btn:active { transform: scale(.98); }
     .btn.primary { background: #0C447C; color: #fff; border-color: #0C447C; }
@@ -57,90 +88,159 @@
   </style>
 </head>
 <body>
-  <div class="app">
-    <h1>Captura diaria — Farmacias R3</h1>
-    <p class="subtitle">Sube la conciliación para habilitar los campos de captura.</p>
 
-    <div class="sucursal-row">
-      <button class="stab blue" id="t-mad" onclick="setSuc('Madrazo')">Madrazo</button>
-      <button class="stab" id="t-con" onclick="setSuc('Contadero')">Contadero</button>
+  <!-- LOGIN -->
+  <div id="loginScreen">
+    <div class="login-card">
+      <div class="login-logo">
+        <h1>Farmacias R3</h1>
+        <p>Captura diaria de ingresos</p>
+      </div>
+      <div class="field-group">
+        <label>Correo</label>
+        <input type="email" id="loginEmail" placeholder="sucursal@farmacias-r3.com" autocomplete="username">
+      </div>
+      <div class="field-group">
+        <label>Contraseña</label>
+        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+      <div class="login-err" id="loginErr">Correo o contraseña incorrectos.</div>
     </div>
-
-    <div class="card">
-      <div class="clabel">1 — Conciliación PDF</div>
-      <div class="drop" id="dropzone" onclick="document.getElementById('pdfIn').click()">
-        <input type="file" id="pdfIn" accept=".pdf" onchange="loadPDF(this)" onclick="event.stopPropagation()">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="1" width="16" height="22" rx="2" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M15 1v6h6" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M7 11h14M7 15h10M7 19h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        <div class="drop-t"><strong>Seleccionar PDF</strong><br>Conciliación del día</div>
-        <div class="fname" id="fname"></div>
-      </div>
-    </div>
-
-    <div class="card fields-card" id="fieldsCard">
-      <div class="clabel">2 — Formas de pago</div>
-
-      <div class="field-row ref-row">
-        <span class="ref-lbl">Venta total</span>
-        <span class="field-static" id="ventaRow">—</span>
-      </div>
-
-      <div class="spacer"></div>
-
-      <div class="field-row">
-        <span class="field-lbl">Depósito 1</span>
-        <span class="field-prefix">$</span>
-        <input type="number" id="dep1" placeholder="0.00" step="0.01" oninput="recalc()">
-      </div>
-      <div class="field-row">
-        <span class="field-lbl">Depósito 2</span>
-        <span class="field-prefix">$</span>
-        <input type="number" id="dep2" placeholder="0.00" step="0.01" oninput="recalc()">
-      </div>
-      <div class="field-row">
-        <span class="field-lbl">Crédito</span>
-        <span class="field-prefix">$</span>
-        <input type="number" id="cred" placeholder="0.00" step="0.01" oninput="recalc()">
-      </div>
-      <div class="field-row">
-        <span class="field-lbl">Débito</span>
-        <span class="field-prefix">$</span>
-        <input type="number" id="deb" placeholder="0.00" step="0.01" oninput="recalc()">
-      </div>
-      <div class="field-row">
-        <span class="field-lbl">Amex</span>
-        <span class="field-prefix">$</span>
-        <input type="number" id="amex" placeholder="0.00" step="0.01" oninput="recalc()">
-      </div>
-
-      <div class="total-row">
-        <span class="total-lbl">Total capturado</span>
-        <span class="total-val" id="totalCap">$0.00</span>
-      </div>
-
-      <div id="diffBox"></div>
-    </div>
-
-    <div class="actions">
-      <button class="btn primary" id="submitBtn" disabled onclick="enviar()">Registrar en Google Sheets</button>
-      <button class="btn" onclick="limpiar()">Limpiar</button>
-    </div>
-    <div class="status" id="statusMsg"></div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    let suc = 'Madrazo', ventaPDF = null;
+  <!-- APP -->
+  <div id="appScreen">
+    <div class="topbar">
+      <span class="topbar-title">Captura diaria — Farmacias R3</span>
+      <div class="topbar-user">
+        <span class="user-badge" id="userBadge"></span>
+        <button class="logout-btn" onclick="doLogout()">Salir</button>
+      </div>
+    </div>
 
-    function setSuc(s) {
-      suc = s;
-      document.getElementById('t-mad').className = 'stab' + (s === 'Madrazo' ? ' blue' : '');
-      document.getElementById('t-con').className = 'stab' + (s === 'Contadero' ? ' teal' : '');
+    <div class="app">
+      <div class="card">
+        <div class="clabel">1 — Conciliación PDF</div>
+        <div class="drop" id="dropzone" onclick="document.getElementById('pdfIn').click()">
+          <input type="file" id="pdfIn" accept=".pdf" onchange="loadPDF(this)" onclick="event.stopPropagation()">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="3" y="1" width="16" height="22" rx="2" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M15 1v6h6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M7 11h14M7 15h10M7 19h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <div class="drop-t"><strong>Seleccionar PDF</strong><br>Conciliación del día</div>
+          <div class="fname" id="fname"></div>
+        </div>
+      </div>
+
+      <div class="card fields-card" id="fieldsCard">
+        <div class="clabel">2 — Formas de pago</div>
+        <div class="field-row ref-row">
+          <span class="ref-lbl">Venta total</span>
+          <span class="field-static" id="ventaRow">—</span>
+        </div>
+        <div class="spacer"></div>
+        <div class="field-row">
+          <span class="field-lbl">Depósito 1</span>
+          <span class="field-prefix">$</span>
+          <input type="number" id="dep1" placeholder="0.00" step="0.01" oninput="recalc()">
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">Depósito 2</span>
+          <span class="field-prefix">$</span>
+          <input type="number" id="dep2" placeholder="0.00" step="0.01" oninput="recalc()">
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">Crédito</span>
+          <span class="field-prefix">$</span>
+          <input type="number" id="cred" placeholder="0.00" step="0.01" oninput="recalc()">
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">Débito</span>
+          <span class="field-prefix">$</span>
+          <input type="number" id="deb" placeholder="0.00" step="0.01" oninput="recalc()">
+        </div>
+        <div class="field-row">
+          <span class="field-lbl">Amex</span>
+          <span class="field-prefix">$</span>
+          <input type="number" id="amex" placeholder="0.00" step="0.01" oninput="recalc()">
+        </div>
+        <div class="total-row">
+          <span class="total-lbl">Total capturado</span>
+          <span class="total-val" id="totalCap">$0.00</span>
+        </div>
+        <div id="diffBox"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="submitBtn" disabled onclick="enviar()">Registrar en Google Sheets</button>
+        <button class="btn" onclick="limpiar()">Limpiar</button>
+      </div>
+      <div class="status" id="statusMsg"></div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://xvvqgkmnfegnxjsnpbob.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2dnFna21uZmVnbnhqc25wYm9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODgyNTIsImV4cCI6MjA5MjM2NDI1Mn0.XalAcjkhMPTobfOWT3zLC04Hs7lVtPbJdeTOwCS9Y4I';
+    const { createClient } = supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const SUCURSAL_MAP = {
+      '76662r3@gmail.com': 'Madrazo',
+      '77747r3@gmail.com': 'Contadero',
+    };
+
+    let currentSucursal = '';
+    let ventaPDF = null;
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    async function doLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      const btn = document.getElementById('loginBtn');
+      const err = document.getElementById('loginErr');
+      err.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Entrando...';
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error || !data.user) {
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+        return;
+      }
+      const suc = SUCURSAL_MAP[email] || email;
+      mostrarApp(suc);
     }
+
+    function mostrarApp(suc) {
+      currentSucursal = suc;
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appScreen').style.display = 'block';
+      const badge = document.getElementById('userBadge');
+      badge.textContent = suc;
+      badge.className = 'user-badge ' + (suc === 'Madrazo' ? 'badge-mad' : 'badge-con');
+    }
+
+    async function doLogout() {
+      await sb.auth.signOut();
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appScreen').style.display = 'none';
+      document.getElementById('loginEmail').value = '';
+      document.getElementById('loginPass').value = '';
+      document.getElementById('loginBtn').textContent = 'Entrar';
+      limpiar();
+    }
+
+    sb.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        const suc = SUCURSAL_MAP[session.user.email] || session.user.email;
+        mostrarApp(suc);
+      }
+    });
 
     async function loadPDF(input) {
       const file = input.files[0]; if (!file) return;
@@ -197,16 +297,16 @@
       const total = val('dep1') + val('dep2') + val('cred') + val('deb') + val('amex');
       document.getElementById('totalCap').textContent = fmt(total);
       const db = document.getElementById('diffBox');
-      const sb = document.getElementById('submitBtn');
-      if (!ventaPDF || total === 0) { db.innerHTML = ''; sb.disabled = true; return; }
+      const sb2 = document.getElementById('submitBtn');
+      if (!ventaPDF || total === 0) { db.innerHTML = ''; sb2.disabled = true; return; }
       const diff = Math.abs(total - ventaPDF);
       if (diff < 1) {
         db.innerHTML = `<div class="diff-box diff-ok"><span class="diff-lbl">Cuadrado</span><span class="diff-val">${fmt(ventaPDF)}</span></div>`;
-        sb.disabled = false;
+        sb2.disabled = false;
       } else {
         const signo = total > ventaPDF ? 'Sobra' : 'Falta';
         db.innerHTML = `<div class="diff-box diff-err"><span class="diff-lbl">${signo} ${fmt(diff)}</span><span class="diff-val">No cuadra</span></div>`;
-        sb.disabled = true;
+        sb2.disabled = true;
       }
     }
 
@@ -215,12 +315,9 @@
       sm.className = 'status';
       sm.textContent = 'Enviando a Google Sheets...';
       document.getElementById('submitBtn').disabled = true;
-
-      // ── Aquí irá la URL de tu Google Apps Script cuando lo configures ──
       const SCRIPT_URL = 'TU_URL_AQUI';
-
       const payload = {
-        sucursal: suc,
+        sucursal: currentSucursal,
         fecha: new Date().toLocaleDateString('es-MX'),
         ventaTotal: ventaPDF,
         deposito1: val('dep1'),
@@ -230,21 +327,19 @@
         amex: val('amex'),
         totalCapturado: val('dep1') + val('dep2') + val('cred') + val('deb') + val('amex')
       };
-
       if (SCRIPT_URL === 'TU_URL_AQUI') {
         setTimeout(() => {
           sm.className = 'status ok';
-          sm.textContent = 'Modo prueba — datos listos para enviar: ' + JSON.stringify(payload);
+          sm.textContent = 'Modo prueba — ' + currentSucursal + ' · ' + payload.fecha;
           document.getElementById('submitBtn').disabled = false;
         }, 800);
         return;
       }
-
       fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
         .then(r => r.json())
         .then(() => {
           sm.className = 'status ok';
-          sm.textContent = 'Registro guardado — ' + suc + ' · ' + payload.fecha;
+          sm.textContent = 'Registro guardado — ' + currentSucursal + ' · ' + payload.fecha;
         })
         .catch(() => {
           sm.className = 'status err';
