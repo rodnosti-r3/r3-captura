@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Captura Diaria — Farmacias R3</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
+    .app { max-width: 580px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+    .subtitle { font-size: 14px; color: #666; margin-bottom: 2rem; }
+    .sucursal-row { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+    .stab { padding: 6px 20px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #d0d0d0; background: transparent; color: #666; transition: all .15s; }
+    .stab.blue { background: #E6F1FB; color: #0C447C; border-color: #B5D4F4; }
+    .stab.teal { background: #E1F5EE; color: #085041; border-color: #9FE1CB; }
+    .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1.25rem; margin-bottom: 14px; }
+    .clabel { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 12px; }
+    .drop { border: 1.5px dashed #ccc; border-radius: 8px; padding: 1.5rem 1rem; text-align: center; cursor: pointer; transition: all .15s; position: relative; }
+    .drop:hover { border-color: #888; background: #fafafa; }
+    .drop.loaded { border-style: solid; border-color: #9FE1CB; background: #f0fbf6; }
+    .drop input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop svg { display: block; margin: 0 auto 8px; color: #aaa; }
+    .drop-t { font-size: 13px; color: #888; }
+    .drop-t strong { color: #333; font-weight: 600; }
+    .fname { font-size: 12px; color: #085041; margin-top: 6px; font-weight: 600; }
+    .fields-card { opacity: .4; pointer-events: none; transition: opacity .25s; }
+    .fields-card.active { opacity: 1; pointer-events: all; }
+    .field-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+    .field-row:last-child { border-bottom: none; }
+    .field-lbl { font-size: 13px; color: #666; width: 115px; flex-shrink: 0; }
+    .field-prefix { font-size: 13px; color: #bbb; }
+    .field-static { flex: 1; font-size: 15px; font-weight: 600; text-align: right; color: #0C447C; }
+    .field-row.ref-row { background: #f7f9ff; margin: 0 -1.25rem; padding: 10px 1.25rem; border-radius: 0; border-bottom: 1px solid #e8e8e8; }
+    .ref-lbl { font-size: 13px; font-weight: 600; color: #333; width: 115px; flex-shrink: 0; }
+    input[type=number] { flex: 1; border: none; background: transparent; font-size: 14px; font-weight: 600; color: #1a1a1a; text-align: right; outline: none; font-family: inherit; }
+    input[type=number]::placeholder { color: #ccc; font-weight: 400; }
+    .spacer { height: 10px; }
+    .total-row { display: flex; align-items: center; gap: 12px; padding: 12px 0 4px; border-top: 1px solid #e8e8e8; margin-top: 4px; }
+    .total-lbl { font-size: 13px; font-weight: 600; color: #666; width: 115px; flex-shrink: 0; }
+    .total-val { flex: 1; font-size: 17px; font-weight: 600; text-align: right; color: #1a1a1a; }
+    .diff-box { border-radius: 8px; padding: 10px 14px; font-size: 13px; display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+    .diff-ok { background: #E1F5EE; color: #085041; }
+    .diff-err { background: #FCEBEB; color: #791F1F; }
+    .diff-lbl { font-weight: 600; }
+    .diff-val { font-weight: 600; font-size: 14px; }
+    .actions { display: flex; gap: 10px; margin-top: 1.25rem; flex-wrap: wrap; }
+    .btn { padding: 10px 22px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid #d0d0d0; background: transparent; color: #333; cursor: pointer; transition: all .15s; }
+    .btn:hover { background: #f5f5f5; }
+    .btn:active { transform: scale(.98); }
+    .btn.primary { background: #0C447C; color: #fff; border-color: #0C447C; }
+    .btn.primary:hover { background: #185FA5; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .status { font-size: 13px; margin-top: 12px; }
+    .status.ok { color: #085041; font-weight: 500; }
+    .status.err { color: #A32D2D; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Captura diaria — Farmacias R3</h1>
+    <p class="subtitle">Sube la conciliación para habilitar los campos de captura.</p>
+
+    <div class="sucursal-row">
+      <button class="stab blue" id="t-mad" onclick="setSuc('Madrazo')">Madrazo</button>
+      <button class="stab" id="t-con" onclick="setSuc('Contadero')">Contadero</button>
+    </div>
+
+    <div class="card">
+      <div class="clabel">1 — Conciliación PDF</div>
+      <div class="drop" id="dropzone" onclick="document.getElementById('pdfIn').click()">
+        <input type="file" id="pdfIn" accept=".pdf" onchange="loadPDF(this)" onclick="event.stopPropagation()">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="1" width="16" height="22" rx="2" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M15 1v6h6" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M7 11h14M7 15h10M7 19h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <div class="drop-t"><strong>Seleccionar PDF</strong><br>Conciliación del día</div>
+        <div class="fname" id="fname"></div>
+      </div>
+    </div>
+
+    <div class="card fields-card" id="fieldsCard">
+      <div class="clabel">2 — Formas de pago</div>
+
+      <div class="field-row ref-row">
+        <span class="ref-lbl">Venta total</span>
+        <span class="field-static" id="ventaRow">—</span>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="field-row">
+        <span class="field-lbl">Depósito 1</span>
+        <span class="field-prefix">$</span>
+        <input type="number" id="dep1" placeholder="0.00" step="0.01" oninput="recalc()">
+      </div>
+      <div class="field-row">
+        <span class="field-lbl">Depósito 2</span>
+        <span class="field-prefix">$</span>
+        <input type="number" id="dep2" placeholder="0.00" step="0.01" oninput="recalc()">
+      </div>
+      <div class="field-row">
+        <span class="field-lbl">Crédito</span>
+        <span class="field-prefix">$</span>
+        <input type="number" id="cred" placeholder="0.00" step="0.01" oninput="recalc()">
+      </div>
+      <div class="field-row">
+        <span class="field-lbl">Débito</span>
+        <span class="field-prefix">$</span>
+        <input type="number" id="deb" placeholder="0.00" step="0.01" oninput="recalc()">
+      </div>
+      <div class="field-row">
+        <span class="field-lbl">Amex</span>
+        <span class="field-prefix">$</span>
+        <input type="number" id="amex" placeholder="0.00" step="0.01" oninput="recalc()">
+      </div>
+
+      <div class="total-row">
+        <span class="total-lbl">Total capturado</span>
+        <span class="total-val" id="totalCap">$0.00</span>
+      </div>
+
+      <div id="diffBox"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="submitBtn" disabled onclick="enviar()">Registrar en Google Sheets</button>
+      <button class="btn" onclick="limpiar()">Limpiar</button>
+    </div>
+    <div class="status" id="statusMsg"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    let suc = 'Madrazo', ventaPDF = null;
+
+    function setSuc(s) {
+      suc = s;
+      document.getElementById('t-mad').className = 'stab' + (s === 'Madrazo' ? ' blue' : '');
+      document.getElementById('t-con').className = 'stab' + (s === 'Contadero' ? ' teal' : '');
+    }
+
+    async function loadPDF(input) {
+      const file = input.files[0]; if (!file) return;
+      document.getElementById('fname').textContent = file.name;
+      document.getElementById('dropzone').classList.add('loaded');
+      document.getElementById('ventaRow').textContent = 'Leyendo...';
+      const ab = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+      let txt = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const pg = await pdf.getPage(i);
+        const tc = await pg.getTextContent();
+        txt += tc.items.map(x => x.str).join(' ') + '\n';
+      }
+      const patterns = [
+        /Venta\s+Neta\s*\+\s*Iva\s+\$?([\d,]+\.?\d{0,2})/i,
+        /Total\s+\$?([\d,]+\.\d{2})\s+\$?([\d,]+\.\d{2})\s*$/im,
+        /Venta\s+Neta\s+[A-Z\s0-9%$.,]+?([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/i,
+      ];
+      let found = null;
+      for (const p of patterns) {
+        const m = txt.match(p);
+        if (m) {
+          const candidates = m.slice(1).map(v => parseFloat((v || '0').replace(/,/g, '')));
+          found = Math.max(...candidates.filter(v => v > 1000));
+          if (found > 0) break;
+        }
+      }
+      if (!found || found <= 0) {
+        const allNums = [...txt.matchAll(/\$\s*([\d,]+\.\d{2})/g)]
+          .map(m => parseFloat(m[1].replace(/,/g, '')))
+          .filter(v => v > 5000 && v < 500000);
+        if (allNums.length) found = allNums.sort((a, b) => b - a)[0];
+      }
+      ventaPDF = found || null;
+      const vr = document.getElementById('ventaRow');
+      if (ventaPDF) {
+        vr.textContent = fmt(ventaPDF);
+        document.getElementById('fieldsCard').classList.add('active');
+      } else {
+        vr.textContent = 'No encontrado';
+      }
+      recalc();
+    }
+
+    function fmt(n) {
+      if (n === null || n === undefined) return '—';
+      return '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function val(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+    function recalc() {
+      const total = val('dep1') + val('dep2') + val('cred') + val('deb') + val('amex');
+      document.getElementById('totalCap').textContent = fmt(total);
+      const db = document.getElementById('diffBox');
+      const sb = document.getElementById('submitBtn');
+      if (!ventaPDF || total === 0) { db.innerHTML = ''; sb.disabled = true; return; }
+      const diff = Math.abs(total - ventaPDF);
+      if (diff < 1) {
+        db.innerHTML = `<div class="diff-box diff-ok"><span class="diff-lbl">Cuadrado</span><span class="diff-val">${fmt(ventaPDF)}</span></div>`;
+        sb.disabled = false;
+      } else {
+        const signo = total > ventaPDF ? 'Sobra' : 'Falta';
+        db.innerHTML = `<div class="diff-box diff-err"><span class="diff-lbl">${signo} ${fmt(diff)}</span><span class="diff-val">No cuadra</span></div>`;
+        sb.disabled = true;
+      }
+    }
+
+    function enviar() {
+      const sm = document.getElementById('statusMsg');
+      sm.className = 'status';
+      sm.textContent = 'Enviando a Google Sheets...';
+      document.getElementById('submitBtn').disabled = true;
+
+      // ── Aquí irá la URL de tu Google Apps Script cuando lo configures ──
+      const SCRIPT_URL = 'TU_URL_AQUI';
+
+      const payload = {
+        sucursal: suc,
+        fecha: new Date().toLocaleDateString('es-MX'),
+        ventaTotal: ventaPDF,
+        deposito1: val('dep1'),
+        deposito2: val('dep2'),
+        credito: val('cred'),
+        debito: val('deb'),
+        amex: val('amex'),
+        totalCapturado: val('dep1') + val('dep2') + val('cred') + val('deb') + val('amex')
+      };
+
+      if (SCRIPT_URL === 'TU_URL_AQUI') {
+        setTimeout(() => {
+          sm.className = 'status ok';
+          sm.textContent = 'Modo prueba — datos listos para enviar: ' + JSON.stringify(payload);
+          document.getElementById('submitBtn').disabled = false;
+        }, 800);
+        return;
+      }
+
+      fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(r => r.json())
+        .then(() => {
+          sm.className = 'status ok';
+          sm.textContent = 'Registro guardado — ' + suc + ' · ' + payload.fecha;
+        })
+        .catch(() => {
+          sm.className = 'status err';
+          sm.textContent = 'Error al conectar. Intenta de nuevo.';
+          document.getElementById('submitBtn').disabled = false;
+        });
+    }
+
+    function limpiar() {
+      ['dep1', 'dep2', 'cred', 'deb', 'amex'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('pdfIn').value = '';
+      document.getElementById('fname').textContent = '';
+      document.getElementById('dropzone').classList.remove('loaded');
+      document.getElementById('fieldsCard').classList.remove('active');
+      document.getElementById('ventaRow').textContent = '—';
+      document.getElementById('totalCap').textContent = '$0.00';
+      document.getElementById('diffBox').innerHTML = '';
+      document.getElementById('statusMsg').textContent = '';
+      document.getElementById('submitBtn').disabled = true;
+      ventaPDF = null;
+    }
+  </script>
+</body>
+</html>
