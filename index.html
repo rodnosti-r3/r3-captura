@@ -1,58 +1,603 @@
-drop table if exists registros;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Captura Diaria — Farmacias R3</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
+    #loginScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .login-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 16px; padding: 2.5rem 2rem; width: 100%; max-width: 380px; }
+    .login-logo { text-align: center; margin-bottom: 2rem; }
+    .login-logo h1 { font-size: 22px; font-weight: 700; }
+    .login-logo p { font-size: 13px; color: #888; margin-top: 4px; }
+    .field-group { margin-bottom: 1rem; }
+    .field-group label { display: block; font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+    .field-group input { width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; }
+    .field-group input:focus { border-color: #0C447C; }
+    .login-btn { width: 100%; padding: 11px; background: #0C447C; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: .5rem; font-family: inherit; }
+    .login-btn:hover { background: #185FA5; }
+    .login-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .login-err { font-size: 13px; color: #A32D2D; background: #FCEBEB; border-radius: 6px; padding: 8px 12px; margin-top: 12px; display: none; }
+    #appScreen { display: none; }
+    .topbar { background: #fff; border-bottom: 1px solid #e8e8e8; padding: 12px 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+    .topbar-title { font-size: 15px; font-weight: 600; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .user-badge { font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+    .badge-mad { background: #E6F1FB; color: #0C447C; }
+    .badge-con { background: #E1F5EE; color: #085041; }
+    .badge-adm { background: #FAEEDA; color: #633806; }
+    .logout-btn { font-size: 12px; color: #888; background: none; border: 1px solid #e0e0e0; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-family: inherit; }
+    .nav-tabs { background: #fff; border-bottom: 1px solid #e8e8e8; display: flex; padding: 0 1.5rem; }
+    .nav-tab { padding: 12px 16px; font-size: 13px; font-weight: 500; color: #888; cursor: pointer; border-bottom: 2px solid transparent; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
+    .nav-tab.active { color: #0C447C; border-bottom-color: #0C447C; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .app { max-width: 680px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .cal-title { font-size: 17px; font-weight: 600; }
+    .cal-nav { display: flex; gap: 6px; }
+    .cal-btn { background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 5px 12px; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .cal-btn:hover { background: #f5f5f5; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .cal-day-name { text-align: center; font-size: 11px; font-weight: 600; color: #aaa; text-transform: uppercase; padding: 4px 0; }
+    .cal-day { aspect-ratio: 1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+    .cal-day.empty, .cal-day.future { color: #ccc; cursor: default; }
+    .cal-day.pending { background: #fff; border-color: #e0e0e0; }
+    .cal-day.pending:hover { border-color: #0C447C; background: #E6F1FB; }
+    .cal-day.done { background: #E1F5EE; border-color: #9FE1CB; color: #085041; cursor: default; }
+    .cal-day.done-admin { background: #E1F5EE; border-color: #9FE1CB; color: #085041; cursor: pointer; }
+    .cal-day.done-admin:hover { background: #FAEEDA; border-color: #FAC775; }
+    .cal-day.today { border-color: #0C447C; font-weight: 700; }
+    .cal-day .dot { width: 5px; height: 5px; border-radius: 50%; background: #1D9E75; margin-top: 3px; }
+    .cal-legend { display: flex; gap: 16px; margin-top: 1rem; flex-wrap: wrap; }
+    .cal-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #666; }
+    .cal-legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+    .suc-tabs { display: flex; gap: 8px; margin-bottom: 1.25rem; }
+    .suc-tab { padding: 6px 18px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #d0d0d0; background: transparent; color: #666; font-family: inherit; }
+    .suc-tab.blue { background: #E6F1FB; color: #0C447C; border-color: #B5D4F4; }
+    .suc-tab.teal { background: #E1F5EE; color: #085041; border-color: #9FE1CB; }
+    .back-btn { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #666; background: none; border: none; cursor: pointer; margin-bottom: 1.25rem; font-family: inherit; padding: 0; }
+    .day-badge { display: inline-block; font-size: 13px; font-weight: 600; padding: 4px 14px; border-radius: 20px; background: #E6F1FB; color: #0C447C; margin-bottom: 1.25rem; }
+    .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1.25rem; margin-bottom: 14px; }
+    .clabel { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 12px; }
+    .drop { border: 1.5px dashed #ccc; border-radius: 8px; padding: 2rem 1rem; text-align: center; cursor: pointer; transition: all .15s; position: relative; }
+    .drop:hover { border-color: #888; background: #fafafa; }
+    .drop.loaded { border-style: solid; border-color: #9FE1CB; background: #f0fbf6; }
+    .drop input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop svg { display: block; margin: 0 auto 8px; color: #aaa; }
+    .drop-t { font-size: 13px; color: #888; }
+    .drop-t strong { color: #333; font-weight: 600; }
+    .fname { font-size: 12px; color: #085041; margin-top: 6px; font-weight: 600; }
+    .preview-card { display: none; }
+    .preview-card.active { display: block; }
+    .section-title { font-size: 11px; font-weight: 600; color: #0C447C; text-transform: uppercase; letter-spacing: .07em; background: #f0f7ff; margin: 0 -1.25rem; padding: 8px 1.25rem; border-top: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8; margin-bottom: 4px; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-lbl { color: #888; }
+    .info-val { font-weight: 600; color: #1a1a1a; }
+    .info-val.big { color: #0C447C; font-size: 16px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 480px; }
+    th { text-align: right; font-weight: 600; color: #888; font-size: 11px; padding: 6px 6px; border-bottom: 1px solid #e8e8e8; white-space: nowrap; }
+    th:first-child { text-align: left; }
+    td { padding: 7px 6px; border-bottom: 1px solid #f5f5f5; text-align: right; }
+    td:first-child { text-align: left; color: #444; max-width: 160px; }
+    tr.total-tr td { font-weight: 600; background: #f0f7ff; color: #0C447C; border-top: 1px solid #e8e8e8; }
+    .actions { display: flex; gap: 10px; margin-top: 1.25rem; }
+    .btn { padding: 10px 22px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid #d0d0d0; background: transparent; color: #333; cursor: pointer; font-family: inherit; transition: all .15s; }
+    .btn:hover { background: #f5f5f5; }
+    .btn.primary { background: #0C447C; color: #fff; border-color: #0C447C; }
+    .btn.primary:hover { background: #185FA5; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .status-msg { font-size: 13px; margin-top: 12px; }
+    .status-msg.ok { color: #085041; font-weight: 500; }
+    .status-msg.err { color: #A32D2D; }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.5rem; }
+    .stat-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 10px; padding: 1rem 1.25rem; }
+    .stat-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .stat-val { font-size: 20px; font-weight: 600; }
+    .stat-sub { font-size: 12px; color: #aaa; margin-top: 2px; }
+    .hist-list { display: flex; flex-direction: column; gap: 8px; }
+    .hist-item { background: #fff; border: 1px solid #e8e8e8; border-radius: 10px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .hist-fecha { font-size: 14px; font-weight: 600; }
+    .hist-suc { font-size: 12px; color: #888; margin-top: 2px; }
+    .hist-venta { font-size: 15px; font-weight: 600; color: #0C447C; }
+    .hist-empty { text-align: center; padding: 3rem; font-size: 14px; color: #888; }
+    .suc-filter { display: flex; gap: 8px; margin-bottom: 1rem; }
+    .filter-btn { padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid #e0e0e0; background: transparent; color: #666; font-family: inherit; }
+    .filter-btn.active { background: #0C447C; color: #fff; border-color: #0C447C; }
+  </style>
+</head>
+<body>
 
-create table registros (
-  id uuid default gen_random_uuid() primary key,
-  fecha date not null,
-  numero_unidad text,
-  nombre_sucursal text,
-  sucursal text not null,
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo"><h1>Farmacias R3</h1><p>Captura diaria de ingresos</p></div>
+    <div class="field-group"><label>Correo</label><input type="email" id="loginEmail" placeholder="correo@gmail.com" autocomplete="username"></div>
+    <div class="field-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Entrar</button>
+    <div class="login-err" id="loginErr">Correo o contraseña incorrectos.</div>
+  </div>
+</div>
 
-  -- Vendedores
-  vendedor1_clave text, vendedor1_nombre text,
-  vendedor1_otros numeric default 0, vendedor1_premio numeric default 0,
-  vendedor1_total numeric default 0, vendedor1_tickets integer default 0,
-  vendedor1_ticket_prom numeric default 0,
-  vendedor2_clave text, vendedor2_nombre text,
-  vendedor2_otros numeric default 0, vendedor2_premio numeric default 0,
-  vendedor2_total numeric default 0, vendedor2_tickets integer default 0,
-  vendedor2_ticket_prom numeric default 0,
-  total_otros numeric default 0, total_premio numeric default 0,
-  total_general numeric default 0, total_tickets integer default 0,
-  total_ticket_prom numeric default 0,
+<div id="appScreen">
+  <div class="topbar">
+    <span class="topbar-title">Farmacias R3</span>
+    <div class="topbar-right">
+      <span class="user-badge" id="userBadge"></span>
+      <button class="logout-btn" onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" id="tab-calendario" onclick="switchTab('calendario')">Calendario</button>
+    <button class="nav-tab" id="tab-historial" onclick="switchTab('historial')">Historial</button>
+  </div>
 
-  -- Familias
-  fam_medicamentos numeric default 0,
-  fam_materiales_diversos numeric default 0,
-  fam_material_curacion numeric default 0,
-  fam_perfumeria numeric default 0,
-  fam_alimentos numeric default 0,
-  fam_maternidad numeric default 0,
-  fam_salud_sexual numeric default 0,
-  fam_suplementos numeric default 0,
-  fam_remedios_herbolarios numeric default 0,
+  <div class="screen active" id="screen-calendario">
+    <div class="app">
+      <div id="adminSucTabs" style="display:none">
+        <div class="suc-tabs">
+          <button class="suc-tab blue" id="st-mad" onclick="setAdminSuc('madrazo')">Madrazo</button>
+          <button class="suc-tab" id="st-con" onclick="setAdminSuc('contadero')">Contadero</button>
+        </div>
+      </div>
+      <div class="cal-header">
+        <span class="cal-title" id="calTitle"></span>
+        <div class="cal-nav">
+          <button class="cal-btn" onclick="cambiarMes(-1)">&#8592;</button>
+          <button class="cal-btn" onclick="cambiarMes(1)">&#8594;</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-legend">
+        <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#E1F5EE;border:1px solid #9FE1CB"></div>Completado</div>
+        <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#fff;border:1px solid #e0e0e0"></div>Pendiente</div>
+        <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#f5f5f3;border:1px solid #e0e0e0"></div>Futuro</div>
+      </div>
+    </div>
+  </div>
 
-  -- Resumen ventas
-  venta_bruta_iva0 numeric default 0,
-  venta_bruta_iva16 numeric default 0,
-  venta_bruta_total numeric default 0,
-  descuentos numeric default 0,
-  devoluciones numeric default 0,
-  descuentos_devoluciones numeric default 0,
-  total_devoluciones numeric default 0,
-  venta_neta_iva0 numeric default 0,
-  venta_neta_iva16 numeric default 0,
-  venta_neta_total numeric default 0,
-  iva numeric default 0,
-  venta_neta_iva numeric default 0,
+  <div class="screen" id="screen-captura">
+    <div class="app">
+      <button class="back-btn" onclick="switchTab('calendario')">&#8592; Volver al calendario</button>
+      <div class="day-badge" id="dayBadge"></div>
+      <div class="card">
+        <div class="clabel">Conciliación PDF</div>
+        <div class="drop" id="dropzone" onclick="document.getElementById('pdfIn').click()">
+          <input type="file" id="pdfIn" accept=".pdf" onchange="loadPDF(this)" onclick="event.stopPropagation()">
+          <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
+            <rect x="3" y="1" width="16" height="22" rx="2" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M15 1v6h6" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M7 11h14M7 15h10M7 19h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <div class="drop-t"><strong>Seleccionar PDF</strong><br>Conciliación del día</div>
+          <div class="fname" id="fname"></div>
+        </div>
+      </div>
 
-  -- Tickets
-  tickets_emitidos integer default 0,
-  tickets_devueltos_dia integer default 0,
-  tickets_devueltos_previos integer default 0,
-  tickets_cancelados integer default 0,
-  tickets_venta_efectiva integer default 0,
+      <div class="card preview-card" id="previewCard">
+        <div class="clabel">Vista previa</div>
 
-  completado boolean default true,
-  created_at timestamp default now(),
-  unique(fecha, sucursal)
-);
+        <div class="section-title">General</div>
+        <div class="info-row"><span class="info-lbl">Fecha</span><span class="info-val" id="p-fecha">—</span></div>
+        <div class="info-row"><span class="info-lbl">Unidad</span><span class="info-val" id="p-unidad">—</span></div>
+        <div class="info-row"><span class="info-lbl">Sucursal</span><span class="info-val" id="p-sucursal">—</span></div>
+        <div class="info-row"><span class="info-lbl">Venta Neta + IVA</span><span class="info-val big" id="p-venta">—</span></div>
+
+        <div class="section-title" style="margin-top:12px">Vendedores</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Vendedor</th><th>Otros</th><th>Premio</th><th>Total</th><th>Tickets</th><th>T.Prom</th></tr></thead>
+            <tbody id="tVendedores"></tbody>
+          </table>
+        </div>
+
+        <div class="section-title" style="margin-top:12px">Familias de productos</div>
+        <div id="familiasRows"></div>
+
+        <div class="section-title" style="margin-top:12px">Resumen de venta</div>
+        <div id="resumenRows"></div>
+
+        <div class="section-title" style="margin-top:12px">Tickets</div>
+        <div id="ticketsRows"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="submitBtn" disabled onclick="enviar()">Registrar día</button>
+        <button class="btn" onclick="limpiarForm()">Limpiar</button>
+      </div>
+      <div class="status-msg" id="statusMsg"></div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-historial">
+    <div class="app">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="suc-filter" id="sucFilter">
+        <button class="filter-btn active" id="f-todos" onclick="filtrarHist('todos')">Todos</button>
+        <button class="filter-btn" id="f-madrazo" onclick="filtrarHist('madrazo')">Madrazo</button>
+        <button class="filter-btn" id="f-contadero" onclick="filtrarHist('contadero')">Contadero</button>
+      </div>
+      <div id="histContent"><div class="hist-empty">Cargando...</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://xvvqgkmnfegnxjsnpbob.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2dnFna21uZmVnbnhqc25wYm9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3ODgyNTIsImV4cCI6MjA5MjM2NDI1Mn0.XalAcjkhMPTobfOWT3zLC04Hs7lVtPbJdeTOwCS9Y4I';
+const ADMIN_EMAIL = 'rodnostir3@gmail.com';
+const SUCURSAL_MAP = { '76662r3@gmail.com': 'madrazo', '77747r3@gmail.com': 'contadero' };
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+let currentUser=null, isAdmin=false, currentSucursal='', adminSuc='madrazo';
+let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
+let registros=[], selectedDate=null, histFiltro='todos';
+let authToken='', extractedData=null;
+
+async function dbGet(path) {
+  const res = await fetch(SUPABASE_URL+'/rest/v1/'+path, {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+authToken, 'Content-Type': 'application/json' }
+  });
+  if (!res.ok) throw new Error('Error '+res.status);
+  return res.json();
+}
+
+async function dbUpsert(payload) {
+  const res = await fetch(SUPABASE_URL+'/rest/v1/registros', {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+authToken, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) { const e = await res.text(); throw new Error(e); }
+  return true;
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginErr');
+  err.style.display='none'; btn.disabled=true; btn.textContent='Entrando...';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error||!data.user) { err.style.display='block'; btn.disabled=false; btn.textContent='Entrar'; return; }
+  authToken = data.session.access_token;
+  iniciarApp(data.user);
+}
+
+function iniciarApp(user) {
+  currentUser=user; isAdmin=user.email===ADMIN_EMAIL;
+  currentSucursal=SUCURSAL_MAP[user.email]||'';
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('appScreen').style.display='block';
+  const badge=document.getElementById('userBadge');
+  if (isAdmin) { badge.textContent='Admin'; badge.className='user-badge badge-adm'; }
+  else if (currentSucursal==='madrazo') { badge.textContent='Madrazo'; badge.className='user-badge badge-mad'; }
+  else { badge.textContent='Contadero'; badge.className='user-badge badge-con'; }
+  document.getElementById('adminSucTabs').style.display = isAdmin ? 'block' : 'none';
+  document.getElementById('sucFilter').style.display = isAdmin ? 'flex' : 'none';
+  switchTab('calendario');
+}
+
+async function doLogout() {
+  await sb.auth.signOut(); authToken='';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('appScreen').style.display='none';
+  document.getElementById('loginEmail').value='';
+  document.getElementById('loginPass').value='';
+  document.getElementById('loginBtn').textContent='Entrar';
+}
+
+sb.auth.onAuthStateChange((event, session) => { if (session) { authToken=session.access_token; iniciarApp(session.user); } });
+
+function switchTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const tabEl=document.getElementById('tab-'+tab);
+  if (tabEl) tabEl.classList.add('active');
+  document.getElementById('screen-'+tab).classList.add('active');
+  if (tab==='calendario') cargarCalendario();
+  if (tab==='historial') cargarHistorial();
+}
+
+function setAdminSuc(suc) {
+  adminSuc=suc;
+  document.getElementById('st-mad').className='suc-tab'+(suc==='madrazo'?' blue':'');
+  document.getElementById('st-con').className='suc-tab'+(suc==='contadero'?' teal':'');
+  cargarCalendario();
+}
+
+async function cargarCalendario() {
+  const suc=isAdmin?adminSuc:currentSucursal;
+  const desde=new Date(calYear,calMonth,1).toISOString().split('T')[0];
+  const hasta=new Date(calYear,calMonth+1,0).toISOString().split('T')[0];
+  try { registros=await dbGet('registros?select=fecha,venta_neta_iva&sucursal=eq.'+suc+'&fecha=gte.'+desde+'&fecha=lte.'+hasta); }
+  catch(e) { registros=[]; }
+  renderCalendario(suc);
+}
+
+function renderCalendario(suc) {
+  document.getElementById('calTitle').textContent=MESES[calMonth]+' '+calYear;
+  const grid=document.getElementById('calGrid');
+  grid.innerHTML='';
+  DIAS.forEach(d=>{ const el=document.createElement('div'); el.className='cal-day-name'; el.textContent=d; grid.appendChild(el); });
+  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const today=new Date(); today.setHours(0,0,0,0);
+  for (let i=0;i<firstDay;i++) { const el=document.createElement('div'); el.className='cal-day empty'; grid.appendChild(el); }
+  for (let d=1;d<=daysInMonth;d++) {
+    const fecha=calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const date=new Date(calYear,calMonth,d);
+    const reg=registros.find(r=>r.fecha===fecha);
+    const el=document.createElement('div');
+    el.innerHTML='<span>'+d+'</span>';
+    if (date>today) { el.className='cal-day future'; }
+    else if (reg) {
+      el.className=isAdmin?'cal-day done-admin':'cal-day done';
+      el.innerHTML+='<div class="dot"></div>';
+      if (isAdmin) el.onclick=()=>abrirCaptura(fecha,suc);
+    } else {
+      el.className='cal-day pending';
+      if (date.toDateString()===today.toDateString()) el.classList.add('today');
+      el.onclick=()=>abrirCaptura(fecha,suc);
+    }
+    grid.appendChild(el);
+  }
+}
+
+function cambiarMes(dir) {
+  calMonth+=dir;
+  if (calMonth>11){calMonth=0;calYear++;}
+  if (calMonth<0){calMonth=11;calYear--;}
+  cargarCalendario();
+}
+
+function abrirCaptura(fecha,suc) {
+  selectedDate=fecha;
+  const [y,m,d]=fecha.split('-');
+  document.getElementById('dayBadge').textContent=(isAdmin?(suc==='madrazo'?'Madrazo':'Contadero')+' — ':'')+d+' de '+MESES[parseInt(m)-1]+' '+y;
+  limpiarForm();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-captura').classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+}
+
+async function loadPDF(input) {
+  const file=input.files[0]; if (!file) return;
+  document.getElementById('fname').textContent=file.name;
+  document.getElementById('dropzone').classList.add('loaded');
+  const ab=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+  let txt='';
+  for (let i=1;i<=pdf.numPages;i++) {
+    const pg=await pdf.getPage(i);
+    const tc=await pg.getTextContent();
+    txt+=tc.items.map(x=>x.str).join(' ')+'\n';
+  }
+  extractedData=parsePDF(txt);
+  mostrarPreview(extractedData);
+  document.getElementById('submitBtn').disabled=!extractedData.venta_neta_iva;
+}
+
+function getNum(txt, label) {
+  const re=new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*\\$?([\\d,]+\\.\\d{2})','i');
+  const m=txt.match(re);
+  return m?parseFloat(m[1].replace(/,/g,'')):0;
+}
+
+function parsePDF(txt) {
+  const d={};
+  const fechaM=txt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  d.fecha=fechaM?fechaM[3]+'-'+fechaM[2]+'-'+fechaM[1]:selectedDate;
+  const unidadM=txt.match(/Unidad\s+(\d+)/i);
+  d.numero_unidad=unidadM?unidadM[1]:'';
+  const sucM=txt.match(/Unidad\s+\d+\s+([A-ZÁÉÍÓÚÑ\s,]+?)(?=VENTAS|REPORTE|\n)/i);
+  d.nombre_sucursal=sucM?sucM[1].trim():'';
+
+  // Familias
+  d.fam_medicamentos=getNum(txt,'01 MEDICAMENTOS');
+  d.fam_materiales_diversos=getNum(txt,'03 MATERIALES DIVERSOS');
+  d.fam_material_curacion=getNum(txt,'04 MATERIAL DE CURACION');
+  d.fam_perfumeria=getNum(txt,'05 PERFUMERIA');
+  d.fam_alimentos=getNum(txt,'06 ALIMENTOS');
+  d.fam_maternidad=getNum(txt,'07 MATERNIDAD');
+  d.fam_salud_sexual=getNum(txt,'08 SALUD SEXUAL');
+  d.fam_suplementos=getNum(txt,'09 SUPLEMENTOS');
+  d.fam_remedios_herbolarios=getNum(txt,'11 REMEDIOS HERBOLARIOS');
+
+  // Resumen ventas — extraer todos los números del bloque de ventas
+  const nums=[...txt.matchAll(/\$([\d,]+\.\d{2})/g)].map(m=>parseFloat(m[1].replace(/,/g,'')));
+  const ventaNetaM=txt.match(/Venta\s+Neta\s*\+\s*Iva\s+\$?([\d,]+\.\d{2})/i);
+  d.venta_neta_iva=ventaNetaM?parseFloat(ventaNetaM[1].replace(/,/g,'')):0;
+
+  const ventaBrutaM=txt.match(/Venta\s+Bruta[\s\S]{0,200}?\$([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})/i);
+  if (ventaBrutaM) { d.venta_bruta_iva0=parseFloat(ventaBrutaM[1].replace(/,/g,'')); d.venta_bruta_iva16=parseFloat(ventaBrutaM[2].replace(/,/g,'')); d.venta_bruta_total=parseFloat(ventaBrutaM[3].replace(/,/g,'')); }
+  else { d.venta_bruta_iva0=0; d.venta_bruta_iva16=0; d.venta_bruta_total=0; }
+
+  const ventaNetaM2=txt.match(/Venta\s+Neta\s+(?!.*Iva)[\s\S]{0,100}?\$([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})/i);
+  if (ventaNetaM2) { d.venta_neta_iva0=parseFloat(ventaNetaM2[1].replace(/,/g,'')); d.venta_neta_iva16=parseFloat(ventaNetaM2[2].replace(/,/g,'')); d.venta_neta_total=parseFloat(ventaNetaM2[3].replace(/,/g,'')); }
+  else { d.venta_neta_iva0=0; d.venta_neta_iva16=0; d.venta_neta_total=0; }
+
+  d.descuentos=getNum(txt,'Descuentos');
+  d.devoluciones=getNum(txt,'Devoluciones');
+  d.descuentos_devoluciones=getNum(txt,'Descuentos por devoluciones');
+  d.total_devoluciones=getNum(txt,'Total Devoluciones');
+  d.iva=d.venta_neta_iva-d.venta_neta_total;
+
+  // Tickets
+  const temM=txt.match(/Tickets\s+Emitidos\s+(\d+)/i);
+  d.tickets_emitidos=temM?parseInt(temM[1]):0;
+  const tveM=txt.match(/Tickets\s+Venta\s+Efectiva\s+(\d+)/i);
+  d.tickets_venta_efectiva=tveM?parseInt(tveM[1]):0;
+  const tdM=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+del\s+mismo\s+d[ií]a\)\s+(\d+)/i);
+  d.tickets_devueltos_dia=tdM?parseInt(tdM[1]):0;
+  const tdpM=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+de\s+d[ií]as\s+previos\)\s+(\d+)/i);
+  d.tickets_devueltos_previos=tdpM?parseInt(tdpM[1]):0;
+  const tcM=txt.match(/Tickets\s+Cancelados\s+(\d+)/i);
+  d.tickets_cancelados=tcM?parseInt(tcM[1]):0;
+
+  // Vendedores
+  d.vendedores=[];
+  const vRe=/(\d+)\s+([A-ZÁÉÍÓÚÑ ]{5,}?)\s+([\d,]+\.\d{2})\s+[\d.]+%\s+([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})/g;
+  let m;
+  while ((m=vRe.exec(txt))!==null) {
+    d.vendedores.push({ clave:m[1], nombre:m[2].trim(), otros:parseFloat(m[3].replace(/,/g,'')), premio:parseFloat(m[4].replace(/,/g,'')), total:parseFloat(m[5].replace(/,/g,'')), tickets:parseInt(m[6]), ticket_prom:parseFloat(m[7].replace(/,/g,'')) });
+  }
+  const tRe=/\$([\d,]+\.\d{2})\s+[\d.]+%\s+\$([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+(\d+)\s+\$([\d,]+\.\d{2})/;
+  const tm=txt.match(tRe);
+  if (tm) { d.total_otros=parseFloat(tm[1].replace(/,/g,'')); d.total_premio=parseFloat(tm[2].replace(/,/g,'')); d.total_general=parseFloat(tm[3].replace(/,/g,'')); d.total_tickets=parseInt(tm[4]); d.total_ticket_prom=parseFloat(tm[5].replace(/,/g,'')); }
+  else { d.total_otros=0; d.total_premio=0; d.total_general=0; d.total_tickets=0; d.total_ticket_prom=0; }
+
+  return d;
+}
+
+function fmt(n) {
+  if (!n && n!==0) return '—';
+  return '$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function infoRow(lbl,val) { return `<div class="info-row"><span class="info-lbl">${lbl}</span><span class="info-val">${val}</span></div>`; }
+
+function mostrarPreview(d) {
+  document.getElementById('p-fecha').textContent=d.fecha||'—';
+  document.getElementById('p-unidad').textContent=d.numero_unidad||'—';
+  document.getElementById('p-sucursal').textContent=d.nombre_sucursal||'—';
+  document.getElementById('p-venta').textContent=fmt(d.venta_neta_iva);
+
+  const tbody=document.getElementById('tVendedores');
+  tbody.innerHTML=(d.vendedores||[]).map(v=>`<tr><td>${v.nombre}</td><td>${fmt(v.otros)}</td><td>${fmt(v.premio)}</td><td>${fmt(v.total)}</td><td>${v.tickets}</td><td>${fmt(v.ticket_prom)}</td></tr>`).join('');
+  if (d.total_general) tbody.innerHTML+=`<tr class="total-tr"><td>Total</td><td>${fmt(d.total_otros)}</td><td>${fmt(d.total_premio)}</td><td>${fmt(d.total_general)}</td><td>${d.total_tickets}</td><td>${fmt(d.total_ticket_prom)}</td></tr>`;
+
+  const fams=[['Medicamentos',d.fam_medicamentos],['Materiales diversos',d.fam_materiales_diversos],['Material de curación',d.fam_material_curacion],['Perfumería',d.fam_perfumeria],['Alimentos',d.fam_alimentos],['Maternidad',d.fam_maternidad],['Salud sexual',d.fam_salud_sexual],['Suplementos',d.fam_suplementos],['Remedios herbolarios',d.fam_remedios_herbolarios]];
+  document.getElementById('familiasRows').innerHTML=fams.filter(([,v])=>v>0).map(([l,v])=>infoRow(l,fmt(v))).join('');
+
+  document.getElementById('resumenRows').innerHTML=[
+    infoRow('Venta bruta IVA 0%',fmt(d.venta_bruta_iva0)),
+    infoRow('Venta bruta IVA 16%',fmt(d.venta_bruta_iva16)),
+    infoRow('Venta bruta total',fmt(d.venta_bruta_total)),
+    infoRow('Descuentos',fmt(d.descuentos)),
+    infoRow('Devoluciones',fmt(d.devoluciones)),
+    infoRow('Desc. por devoluciones',fmt(d.descuentos_devoluciones)),
+    infoRow('Total devoluciones',fmt(d.total_devoluciones)),
+    infoRow('Venta neta IVA 0%',fmt(d.venta_neta_iva0)),
+    infoRow('Venta neta IVA 16%',fmt(d.venta_neta_iva16)),
+    infoRow('Venta neta total',fmt(d.venta_neta_total)),
+    infoRow('IVA',fmt(d.iva)),
+    infoRow('Venta neta + IVA','<strong style="color:#0C447C;font-size:15px">'+fmt(d.venta_neta_iva)+'</strong>'),
+  ].join('');
+
+  document.getElementById('ticketsRows').innerHTML=[
+    infoRow('Tickets emitidos',d.tickets_emitidos||'—'),
+    infoRow('Devueltos (mismo día)',d.tickets_devueltos_dia||'—'),
+    infoRow('Devueltos (días previos)',d.tickets_devueltos_previos||'—'),
+    infoRow('Cancelados',d.tickets_cancelados||'—'),
+    infoRow('Venta efectiva',d.tickets_venta_efectiva||'—'),
+  ].join('');
+
+  document.getElementById('previewCard').classList.add('active');
+}
+
+async function enviar() {
+  const sm=document.getElementById('statusMsg');
+  sm.className='status-msg'; sm.textContent='Registrando...';
+  document.getElementById('submitBtn').disabled=true;
+  const suc=isAdmin?adminSuc:currentSucursal;
+  const v=extractedData.vendedores||[];
+  const payload={
+    fecha:selectedDate, sucursal:suc,
+    numero_unidad:extractedData.numero_unidad||'',
+    nombre_sucursal:extractedData.nombre_sucursal||'',
+    vendedor1_clave:v[0]?.clave||'', vendedor1_nombre:v[0]?.nombre||'',
+    vendedor1_otros:v[0]?.otros||0, vendedor1_premio:v[0]?.premio||0,
+    vendedor1_total:v[0]?.total||0, vendedor1_tickets:v[0]?.tickets||0, vendedor1_ticket_prom:v[0]?.ticket_prom||0,
+    vendedor2_clave:v[1]?.clave||'', vendedor2_nombre:v[1]?.nombre||'',
+    vendedor2_otros:v[1]?.otros||0, vendedor2_premio:v[1]?.premio||0,
+    vendedor2_total:v[1]?.total||0, vendedor2_tickets:v[1]?.tickets||0, vendedor2_ticket_prom:v[1]?.ticket_prom||0,
+    total_otros:extractedData.total_otros||0, total_premio:extractedData.total_premio||0,
+    total_general:extractedData.total_general||0, total_tickets:extractedData.total_tickets||0, total_ticket_prom:extractedData.total_ticket_prom||0,
+    fam_medicamentos:extractedData.fam_medicamentos||0, fam_materiales_diversos:extractedData.fam_materiales_diversos||0,
+    fam_material_curacion:extractedData.fam_material_curacion||0, fam_perfumeria:extractedData.fam_perfumeria||0,
+    fam_alimentos:extractedData.fam_alimentos||0, fam_maternidad:extractedData.fam_maternidad||0,
+    fam_salud_sexual:extractedData.fam_salud_sexual||0, fam_suplementos:extractedData.fam_suplementos||0,
+    fam_remedios_herbolarios:extractedData.fam_remedios_herbolarios||0,
+    venta_bruta_iva0:extractedData.venta_bruta_iva0||0, venta_bruta_iva16:extractedData.venta_bruta_iva16||0, venta_bruta_total:extractedData.venta_bruta_total||0,
+    descuentos:extractedData.descuentos||0, devoluciones:extractedData.devoluciones||0,
+    descuentos_devoluciones:extractedData.descuentos_devoluciones||0, total_devoluciones:extractedData.total_devoluciones||0,
+    venta_neta_iva0:extractedData.venta_neta_iva0||0, venta_neta_iva16:extractedData.venta_neta_iva16||0, venta_neta_total:extractedData.venta_neta_total||0,
+    iva:extractedData.iva||0, venta_neta_iva:extractedData.venta_neta_iva||0,
+    tickets_emitidos:extractedData.tickets_emitidos||0, tickets_devueltos_dia:extractedData.tickets_devueltos_dia||0,
+    tickets_devueltos_previos:extractedData.tickets_devueltos_previos||0, tickets_cancelados:extractedData.tickets_cancelados||0,
+    tickets_venta_efectiva:extractedData.tickets_venta_efectiva||0,
+    completado:true
+  };
+  try {
+    await dbUpsert(payload);
+    sm.className='status-msg ok'; sm.textContent='Día registrado correctamente.';
+    setTimeout(()=>switchTab('calendario'),1500);
+  } catch(e) {
+    sm.className='status-msg err'; sm.textContent='Error: '+e.message;
+    document.getElementById('submitBtn').disabled=false;
+  }
+}
+
+function limpiarForm() {
+  document.getElementById('pdfIn').value='';
+  document.getElementById('fname').textContent='';
+  document.getElementById('dropzone').classList.remove('loaded');
+  document.getElementById('previewCard').classList.remove('active');
+  document.getElementById('statusMsg').textContent='';
+  document.getElementById('submitBtn').disabled=true;
+  extractedData=null;
+}
+
+async function cargarHistorial() {
+  document.getElementById('histContent').innerHTML='<div class="hist-empty">Cargando...</div>';
+  let path='registros?select=*&order=fecha.desc';
+  if (!isAdmin) path+='&sucursal=eq.'+currentSucursal;
+  try {
+    const todos=await dbGet(path);
+    renderStats(todos||[]);
+    renderHist(todos||[]);
+  } catch(e) { document.getElementById('histContent').innerHTML='<div class="hist-empty">Error al cargar.</div>'; }
+}
+
+function renderStats(todos) {
+  const mad=todos.filter(r=>r.sucursal==='madrazo');
+  const con=todos.filter(r=>r.sucursal==='contadero');
+  const sum=arr=>arr.reduce((a,b)=>a+(b.venta_neta_iva||0),0);
+  const grid=document.getElementById('statsGrid');
+  if (isAdmin) {
+    grid.innerHTML=`<div class="stat-card"><div class="stat-label">Madrazo — días registrados</div><div class="stat-val">${mad.length}</div><div class="stat-sub">Total: ${fmt(sum(mad))}</div></div><div class="stat-card"><div class="stat-label">Contadero — días registrados</div><div class="stat-val">${con.length}</div><div class="stat-sub">Total: ${fmt(sum(con))}</div></div>`;
+  } else {
+    grid.innerHTML=`<div class="stat-card"><div class="stat-label">Días registrados</div><div class="stat-val">${todos.length}</div></div><div class="stat-card"><div class="stat-label">Venta acumulada</div><div class="stat-val">${fmt(sum(todos))}</div></div>`;
+  }
+}
+
+function filtrarHist(f) {
+  histFiltro=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('f-'+f).classList.add('active');
+  cargarHistorial();
+}
+
+function renderHist(todos) {
+  let lista=histFiltro!=='todos'&&isAdmin?todos.filter(r=>r.sucursal===histFiltro):todos;
+  const el=document.getElementById('histContent');
+  if (!lista.length) { el.innerHTML='<div class="hist-empty">No hay registros aún.</div>'; return; }
+  el.innerHTML='<div class="hist-list">'+lista.map(r=>{
+    const [y,m,d]=r.fecha.split('-');
+    return `<div class="hist-item"><div><div class="hist-fecha">${d} de ${MESES[parseInt(m)-1]} ${y}</div><div class="hist-suc">${r.sucursal.charAt(0).toUpperCase()+r.sucursal.slice(1)}</div></div><div class="hist-venta">${fmt(r.venta_neta_iva)}</div></div>`;
+  }).join('')+'</div>';
+}
+</script>
+</body>
+</html>
