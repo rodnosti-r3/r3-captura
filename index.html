@@ -452,8 +452,8 @@ function parsePDF(txt, items) {
       d.descuentos_devoluciones = allWithZero[5]||0;  // $3,273.36
       d.devoluciones            = allWithZero[6]||0;  // $7,279.30
       d.total_devoluciones      = allWithZero[8]||0;  // $10,552.66
-      d.venta_bruta_iva0        = allWithZero[13]||0; // $29,309.50
-      d.venta_bruta_iva16       = allWithZero[14]||0; // $13,093.27
+      d.venta_bruta_iva0        = allWithZero[14]||0; // $29,309.50
+      d.venta_bruta_iva16       = allWithZero[13]||0; // $13,093.27
       d.venta_bruta_total       = allWithZero[15]||0; // $42,402.77
       d.venta_neta_iva0         = allWithZero[16]||0; // $22,030.20
       d.venta_neta_iva16        = allWithZero[17]||0; // $9,819.91
@@ -473,21 +473,22 @@ function parsePDF(txt, items) {
 
   window._pdfTxt = txt;
 
-  // Tickets — formato real en PDF: "0 170 170 0 0 0" después de las etiquetas
-  const tkBloque=txt.match(/Tickets\s+(?:Emitidos|Y\s+DEVOLUCIONES)[\s\S]{0,500}?(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i);
-  if (tkBloque) {
-    d.tickets_devueltos_dia      = parseInt(tkBloque[1])||0;
-    d.tickets_emitidos           = parseInt(tkBloque[2])||0;
-    d.tickets_venta_efectiva     = parseInt(tkBloque[3])||0;
-    d.tickets_cancelados         = parseInt(tkBloque[4])||0;
-    d.tickets_devueltos_previos  = parseInt(tkBloque[5])||0;
+  // Tickets — buscar números después de "TICKETS Y DEVOLUCIONES"
+  // En el texto real aparecen como: "0 170 170 0 0 0 Tickets Por Diferencia"
+  const tkSeccion = txt.match(/TICKETS\s+Y\s+DEVOLUCIONES[\s\S]{0,600}/i);
+  if (tkSeccion) {
+    const nums = [...tkSeccion[0].matchAll(/\b(\d+)\b/g)].map(m=>parseInt(m[1]));
+    // Orden en PDF: devueltos_dia, emitidos, venta_efectiva, cancelados, devueltos_previos, por_diferencia
+    d.tickets_devueltos_dia     = nums[0]||0;
+    d.tickets_emitidos          = nums[1]||0;
+    d.tickets_venta_efectiva    = nums[2]||0;
+    d.tickets_cancelados        = nums[3]||0;
+    d.tickets_devueltos_previos = nums[4]||0;
   } else {
-    const tEmit=txt.match(/Tickets\s+Emitidos\s+(\d+)/i); d.tickets_emitidos=tEmit?parseInt(tEmit[1]):0;
-    const tVef=txt.match(/Tickets\s+Venta\s+Efectiva\s+(\d+)/i); d.tickets_venta_efectiva=tVef?parseInt(tVef[1]):0;
-    const tDia=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+del\s+mismo\s+d[ií]a\)\s+(\d+)/i); d.tickets_devueltos_dia=tDia?parseInt(tDia[1]):0;
-    const tPrev=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+de\s+d[ií]as\s+previos\)\s+(\d+)/i); d.tickets_devueltos_previos=tPrev?parseInt(tPrev[1]):0;
-    const tCanc=txt.match(/Tickets\s+Cancelados\s+(\d+)/i); d.tickets_cancelados=tCanc?parseInt(tCanc[1]):0;
+    d.tickets_emitidos=0; d.tickets_venta_efectiva=0;
+    d.tickets_devueltos_dia=0; d.tickets_devueltos_previos=0; d.tickets_cancelados=0;
   }
+  window._tkNums = tkSeccion ? [...tkSeccion[0].matchAll(/\b(\d+)\b/g)].map(m=>parseInt(m[1])) : [];
 
   return d;
 }
