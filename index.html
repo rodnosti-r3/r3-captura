@@ -408,15 +408,12 @@ function parsePDF(txt, items) {
 
   // Vendedores: usar porcentajes como anclas, buscar nombre hacia atrás
   d.vendedores=[];
-  const bloqueVend=txt.match(/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR([\s\S]*?)VENTAS\s+POR\s+FAMILIAS/i);
+  const bloqueVend=txt.match(/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR([\s\S]*?)(?:Familia\s+Descripci|VENTAS\s+POR\s+FAMILIAS)/i);
   if (bloqueVend) {
     const bv=bloqueVend[1];
     const pctMatches=[...bv.matchAll(/([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g)];
-    window._pctMatches=pctMatches.map(pm=>({antes:bv.substring(Math.max(0,pm.index-80),pm.index)}));
     for (const pm of pctMatches) {
       const antes=bv.substring(0, pm.index);
-      // Buscar secuencia: clave + nombre (palabras con mayúscula) al final del texto anterior
-      // Ignorar números decimales intermedios
       const nombreM=antes.match(/\b(\d{1,2})\s+((?:[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+\s+){2,5}[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+)\s*$/);
       if (nombreM) {
         const nombre=nombreM[2].trim();
