@@ -422,20 +422,20 @@ function parsePDF(txt, items, lineas) {
   // Vendedores — buscar filas con patrón: clave nombre otros% premio $total tickets ticketprom
   window._pdfTxt = txt;
 
-  window._lineas = lineas;
-  // Vendedores: buscar por nombre exacto en el texto
+  window._pdfTxt = txt;
+  // Vendedores: buscar cada uno individualmente con clave + nombre
   d.vendedores=[];
-  const VENDEDORAS = [
-    'Sandra Urbina Gonzalez',
-    'Karla Deyaneira Granados Alberto',
-    'Jessika Darinka Vilchis Reyes',
+  const VENDEDORAS=[
+    {clave:'10', nombre:'Sandra Urbina Gonzalez'},
+    {clave:'11', nombre:'Karla Deyaneira Granados Alberto'},
+    {clave:'2',  nombre:'Jessika Darinka Vilchis Reyes'},
   ];
-  for (const nombre of VENDEDORAS) {
-    // Buscar nombre en el texto y extraer números que siguen
-    const re = new RegExp(nombre + '\\s+([\\d,]+\\.\\d{2})\\s+[\\d.]+%\\s+([\\d,]+\\.\\d{2})\\s+\\$([\\d,]+\\.\\d{2})\\s+(\\d+)\\s+([\\d,]+\\.\\d{2})', 'i');
-    const m = txt.match(re);
+  for (const v of VENDEDORAS) {
+    const palabras=v.nombre.split(' ').join('\\s+');
+    const re=new RegExp(v.clave+'\\s+'+palabras+'\\s+([\\d,]+\\.\\d{2})\\s+[\\d.]+%\\s+([\\d,]+\\.\\d{2})\\s+\\$([\\d,]+\\.\\d{2})\\s+(\\d+)\\s+([\\d,]+\\.\\d{2})','i');
+    const m=txt.match(re);
     if (m) {
-      d.vendedores.push({ clave:'', nombre, otros:n(m[2]), premio:n(m[1]), total:n(m[3]), tickets:parseInt(m[4]), ticket_prom:n(m[5]) });
+      d.vendedores.push({clave:v.clave, nombre:v.nombre, premio:n(m[1]), otros:n(m[2]), total:n(m[3]), tickets:parseInt(m[4]), ticket_prom:n(m[5])});
     }
   }
 
