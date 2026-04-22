@@ -473,15 +473,14 @@ function parsePDF(txt, items) {
 
   window._pdfTxt = txt;
 
-  // Tickets — texto real: "Venta Efectiva 0 170 170 0 0 Tickets Por Diferencia 0"
-  // Orden: venta_efectiva, devueltos_dia, emitidos, cancelados, devueltos_previos
-  const tkM=txt.match(/Venta\s+Efectiva\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i);
+  // Tickets — texto real: "Efectiva 0 170 170 0 0 Tickets Por Diferencia 0"
+  const tkM=txt.match(/Efectiva\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i);
   if (tkM) {
-    d.tickets_venta_efectiva    = parseInt(tkM[1])||0;
-    d.tickets_devueltos_dia     = parseInt(tkM[2])||0;
-    d.tickets_emitidos          = parseInt(tkM[3])||0;
-    d.tickets_cancelados        = parseInt(tkM[4])||0;
-    d.tickets_devueltos_previos = parseInt(tkM[5])||0;
+    d.tickets_venta_efectiva    = parseInt(tkM[3])||0; // 170 (tercer número)
+    d.tickets_emitidos          = parseInt(tkM[2])||0; // 170 (segundo número)
+    d.tickets_devueltos_dia     = parseInt(tkM[1])||0; // 0
+    d.tickets_cancelados        = parseInt(tkM[4])||0; // 0
+    d.tickets_devueltos_previos = parseInt(tkM[5])||0; // 0
   } else {
     d.tickets_emitidos=0; d.tickets_venta_efectiva=0;
     d.tickets_devueltos_dia=0; d.tickets_devueltos_previos=0; d.tickets_cancelados=0;
