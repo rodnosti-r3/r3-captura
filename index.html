@@ -406,19 +406,22 @@ function parsePDF(txt, items) {
   // Vendedores — buscar filas con patrón: clave nombre otros% premio $total tickets ticketprom
   window._pdfTxt = txt;
 
-  // Vendedores: extraer del bloque específico, buscar cada entrada por porcentaje
+  // Vendedores: usar porcentajes como anclas para encontrar cada registro
   d.vendedores=[];
   const bloqueVend=txt.match(/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR([\s\S]*?)VENTAS\s+POR\s+FAMILIAS/i);
   if (bloqueVend) {
     const bv=bloqueVend[1];
-    // Cada vendedor: número nombre porcentaje% $total tickets ticketprom otros
-    const vParts=bv.split(/(?=\d{1,2}\s+[A-ZÁÉÍÓÚÑ])/);
-    for (const parte of vParts) {
-      const pm=parte.match(/^(\d{1,2})\s+([\s\S]+?)\s+([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/);
-      if (pm) {
-        const nombre=pm[2].trim().replace(/\s+/g,' ');
-        if (nombre.split(' ').length>=2 && !nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|VENTAS|Prom)/i)) {
-          d.vendedores.push({ clave:pm[1], nombre, otros:n(pm[7]), premio:0, total:n(pm[4]), tickets:parseInt(pm[5]), ticket_prom:n(pm[6]) });
+    // Encontrar todas las posiciones de XX.XX%
+    const pctMatches=[...bv.matchAll(/([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g)];
+    for (const pm of pctMatches) {
+      // Buscar el nombre: texto antes del porcentaje
+      const antes=bv.substring(0, pm.index);
+      // El nombre termina justo antes del porcentaje, buscar último número seguido de nombre
+      const nombreM=antes.match(/(\d{1,2})\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+){1,5})\s*$/);
+      if (nombreM) {
+        const nombre=nombreM[2].trim();
+        if (nombre.split(' ').length>=2) {
+          d.vendedores.push({ clave:nombreM[1], nombre, otros:n(pm[5]), premio:0, total:n(pm[2]), tickets:parseInt(pm[3]), ticket_prom:n(pm[4]) });
         }
       }
     }
