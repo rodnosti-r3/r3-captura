@@ -404,33 +404,53 @@ function parsePDF(txt, items) {
   d.venta_neta_iva=vM?n(vM[1]):0;
 
   // Vendedores — buscar filas con patrón: clave nombre otros% premio $total tickets ticketprom
-  // Vendedores: clave nombre otros XX.XX% premio $total tickets ticketprom
+  window._pdfTxt = txt;
+
+  // Vendedores: clave nombre XX.XX% $total tickets ticketprom otros
+  // Formato real: "10 Sandra Urbina Gonzalez 40.94% $11,136.43 52 214.16 4,559.31"
   d.vendedores=[];
-  const vRe=/(\d+)\s+([\w\s\.]+?)\s+([\d,]+\.\d{2})\s+[\d.]+%\s+([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})/g;
+  const vRe=/(\d+)\s+((?:[A-Za-záéíóúÁÉÍÓÚñÑ]+\s+){2,5})([\d.]+)%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g;
   let m;
   while ((m=vRe.exec(txt))!==null) {
     const nombre=m[2].trim();
-    if (nombre.length>3 && !nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|Otros|Premio|VENTAS|REPORTE|Unidad)/i)) {
-      d.vendedores.push({ clave:m[1], nombre, otros:n(m[3]), premio:n(m[4]), total:n(m[5]), tickets:parseInt(m[6]), ticket_prom:n(m[7]) });
+    if (nombre.length>3 && !nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|VENTAS|REPORTE|Unidad)/i)) {
+      d.vendedores.push({ clave:m[1], nombre, otros:n(m[7]), premio:0, total:n(m[4]), tickets:parseInt(m[5]), ticket_prom:n(m[6]) });
     }
   }
 
-  // Totales vendedores: $otros XX% $premio $total tickets $ticketprom
+  // Si no encontró vendedores con ese formato, intentar formato alternativo
+  if (d.vendedores.length===0) {
+    const vRe2=/(\d+)\s+((?:[A-Za-záéíóúÁÉÍÓÚñÑ]+\s+){2,5})([\d,]+\.\d{2})\s+[\d.]+%\s+([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})/g;
+    while ((m=vRe2.exec(txt))!==null) {
+      const nombre=m[2].trim();
+      if (nombre.length>3 && !nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|VENTAS|REPORTE|Unidad)/i)) {
+        d.vendedores.push({ clave:m[1], nombre, otros:n(m[3]), premio:n(m[4]), total:n(m[5]), tickets:parseInt(m[6]), ticket_prom:n(m[7]) });
+      }
+    }
+  }
+
+  // Totales vendedores
   const tRe=/\$([\d,]+\.\d{2})\s+[\d.]+%\s+\$([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+(\d+)\s+\$([\d,]+\.\d{2})/;
   const tm=txt.match(tRe);
   if (tm) { d.total_otros=n(tm[1]); d.total_premio=n(tm[2]); d.total_general=n(tm[3]); d.total_tickets=parseInt(tm[4]); d.total_ticket_prom=n(tm[5]); }
-  else { d.total_otros=0; d.total_premio=0; d.total_general=0; d.total_tickets=0; d.total_ticket_prom=0; }
+  else {
+    // Formato alternativo del total: buscar la línea con el total de todos los vendedores
+    const tRe2=/([\d,]+\.\d{2})\s+[\d.]+%\s+([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+(\d+)\s+\$([\d,]+\.\d{2})/;
+    const tm2=txt.match(tRe2);
+    if (tm2) { d.total_otros=n(tm2[1]); d.total_premio=n(tm2[2]); d.total_general=n(tm2[3]); d.total_tickets=parseInt(tm2[4]); d.total_ticket_prom=n(tm2[5]); }
+    else { d.total_otros=0; d.total_premio=0; d.total_general=0; d.total_tickets=0; d.total_ticket_prom=0; }
+  }
 
-  // Familias
+  // Familias - formato real: "01 MEDICAMENTOS 21,315.34"
   const famPatterns=[
-    ['01 MEDICAMENTOS','fam_medicamentos'],['03 MATERIALES DIVERSOS','fam_materiales_diversos'],
-    ['04 MATERIAL DE CURACION','fam_material_curacion'],['05 PERFUMERIA','fam_perfumeria'],
-    ['06 ALIMENTOS','fam_alimentos'],['07 MATERNIDAD','fam_maternidad'],
-    ['08 SALUD SEXUAL','fam_salud_sexual'],['09 SUPLEMENTOS','fam_suplementos'],
-    ['10 PROMOCIONALES','fam_promocionales'],['11 REMEDIOS HERBOLARIOS','fam_remedios_herbolarios']
+    ['01\\s+MEDICAMENTOS','fam_medicamentos'],['03\\s+MATERIALES\\s+DIVERSOS','fam_materiales_diversos'],
+    ['04\\s+MATERIAL\\s+DE\\s+CURACION','fam_material_curacion'],['05\\s+PERFUMERIA','fam_perfumeria'],
+    ['06\\s+ALIMENTOS','fam_alimentos'],['07\\s+MATERNIDAD','fam_maternidad'],
+    ['08\\s+SALUD\\s+SEXUAL','fam_salud_sexual'],['09\\s+SUPLEMENTOS','fam_suplementos'],
+    ['10\\s+PROMOCIONALES','fam_promocionales'],['11\\s+REMEDIOS\\s+HERBOLARIOS','fam_remedios_herbolarios']
   ];
-  for (const [label,key] of famPatterns) {
-    const re=new RegExp(label.replace(/\s+/g,'\\s+')+'\\s+([\d,]+\\.\\d{2})','i');
+  for (const [pat,key] of famPatterns) {
+    const re=new RegExp(pat+'\\s+([\\d,]+\\.\\d{2})','i');
     const fm=txt.match(re);
     d[key]=fm?n(fm[1]):0;
   }
@@ -461,12 +481,17 @@ function parsePDF(txt, items) {
 
   window._pdfTxt = txt;
 
-  // Tickets
-  const tEmit=txt.match(/Tickets\s+Emitidos\s+(\d+)/i);          d.tickets_emitidos=tEmit?parseInt(tEmit[1]):0;
-  const tVef=txt.match(/Tickets\s+Venta\s+Efectiva\s+(\d+)/i);    d.tickets_venta_efectiva=tVef?parseInt(tVef[1]):0;
+  // Tickets - formato real: números después de las etiquetas
+  const tEmit=txt.match(/Tickets\s+Emitidos\s+(\d+)/i); d.tickets_emitidos=tEmit?parseInt(tEmit[1]):0;
+  const tVef=txt.match(/Tickets\s+Venta\s+Efectiva\s+(\d+)/i); d.tickets_venta_efectiva=tVef?parseInt(tVef[1]):0;
   const tDia=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+del\s+mismo\s+d[ií]a\)\s+(\d+)/i); d.tickets_devueltos_dia=tDia?parseInt(tDia[1]):0;
   const tPrev=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+de\s+d[ií]as\s+previos\)\s+(\d+)/i); d.tickets_devueltos_previos=tPrev?parseInt(tPrev[1]):0;
-  const tCanc=txt.match(/Tickets\s+Cancelados\s+(\d+)/i);          d.tickets_cancelados=tCanc?parseInt(tCanc[1]):0;
+  const tCanc=txt.match(/Tickets\s+Cancelados\s+(\d+)/i); d.tickets_cancelados=tCanc?parseInt(tCanc[1]):0;
+  // Fallback: buscar bloque de tickets "X 170 170 X X X"
+  if (!d.tickets_emitidos) {
+    const tkBloque=txt.match(/Tickets\s+(?:Emitidos|Y\s+DEVOLUCIONES)[\s\S]{0,300}?(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i);
+    if (tkBloque) { d.tickets_devueltos_dia=parseInt(tkBloque[1]); d.tickets_emitidos=parseInt(tkBloque[2]); d.tickets_venta_efectiva=parseInt(tkBloque[3]); d.tickets_cancelados=parseInt(tkBloque[4]); d.tickets_devueltos_previos=parseInt(tkBloque[5]); }
+  }
 
   return d;
 }
