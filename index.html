@@ -406,19 +406,43 @@ function parsePDF(txt, items) {
   // Vendedores — buscar filas con patrón: clave nombre otros% premio $total tickets ticketprom
   window._pdfTxt = txt;
 
-  // Vendedores: usar porcentajes como anclas, buscar nombre hacia atrás
+  // Vendedores: leer por items individuales del PDF (no texto corrido)
   d.vendedores=[];
-  const bloqueVend=txt.match(/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR([\s\S]*?)(?:Familia\s+Descripci|VENTAS\s+POR\s+FAMILIAS)/i);
-  if (bloqueVend) {
-    const bv=bloqueVend[1];
-    const pctMatches=[...bv.matchAll(/([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g)];
-    for (const pm of pctMatches) {
-      const antes=bv.substring(0, pm.index);
-      const nombreM=antes.match(/\b(\d{1,2})\s+((?:[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+\s+){2,5}[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+)\s*$/);
-      if (nombreM) {
-        const nombre=nombreM[2].trim();
-        d.vendedores.push({ clave:nombreM[1], nombre, otros:n(pm[5]), premio:0, total:n(pm[2]), tickets:parseInt(pm[3]), ticket_prom:n(pm[4]) });
-      }
+  // El PDF tiene cada valor separado - buscar por posición en el array de items
+  // Formato por item: [clave, nombre(s), otros, porcentaje, total, tickets, ticket_prom]
+  // Buscar en items[] en lugar de txt
+  const iVend=items.findIndex(i=>/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR/i.test(i));
+  const iFam=items.findIndex(i=>/Familia\s+Descripci/i.test(i) || /VENTAS\s+POR\s+FAMILIAS/i.test(i));
+  if (iVend>=0 && iFam>iVend) {
+    const vendItems=items.slice(iVend+1, iFam);
+    // Cada vendedor tiene: clave(1) nombre(varios) otros(1) porcentaje%(1) $total(1) tickets(1) ticketprom(1)
+    // Identificar filas de vendedor: item que es un número pequeño (clave)
+    let i=0;
+    while (i<vendItems.length) {
+      const item=vendItems[i];
+      // Clave: número 1-99 solo
+      if (/^\d{1,2}$/.test(item.trim())) {
+        const clave=item.trim();
+        // Recoger nombre (palabras con mayúscula)
+        let nombre=''; let j=i+1;
+        while (j<vendItems.length && /^[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+$/.test(vendItems[j].trim())) {
+          nombre+=(nombre?' ':'')+vendItems[j].trim(); j++;
+        }
+        // Siguiente: otros (número con decimales)
+        const otros=n(vendItems[j]); j++;
+        // Siguiente: porcentaje (puede incluir %)
+        j++; // skip porcentaje
+        // Siguiente: $total
+        const total=n((vendItems[j]||'').replace('$','')); j++;
+        // Siguiente: tickets
+        const tickets=parseInt(vendItems[j]||'0'); j++;
+        // Siguiente: ticket_prom
+        const ticket_prom=n(vendItems[j]||'0'); j++;
+        if (nombre && nombre.split(' ').length>=2) {
+          d.vendedores.push({ clave, nombre, otros, premio:0, total, tickets, ticket_prom });
+        }
+        i=j;
+      } else { i++; }
     }
   }
 
