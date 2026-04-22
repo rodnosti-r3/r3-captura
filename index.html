@@ -422,6 +422,7 @@ function parsePDF(txt, items, lineas) {
   // Vendedores — buscar filas con patrón: clave nombre otros% premio $total tickets ticketprom
   window._pdfTxt = txt;
 
+  window._lineas = lineas;
   // Vendedores: leer renglón por renglón
   d.vendedores=[];
   let enVendedores=false;
