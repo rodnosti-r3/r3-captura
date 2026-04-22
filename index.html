@@ -406,13 +406,15 @@ function parsePDF(txt, items) {
   // Vendedores — buscar filas con patrón: clave nombre otros% premio $total tickets ticketprom
   window._pdfTxt = txt;
 
-  // Vendedores: buscar todos los nombres seguidos de XX.XX% $total tickets ticketprom otros
+  // Vendedores: buscar el bloque entre VENTAS DE PRODUCTOS POR VENDEDOR y VENTAS POR FAMILIAS
   d.vendedores=[];
-  const vMatches=[...txt.matchAll(/(\d{1,2})\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñA-ZÁÉÍÓÚÑ]*(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ][a-záéíóúñA-ZÁÉÍÓÚÑ]*){1,4})\s+([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g)];
+  const bloqueVend=txt.match(/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR[\s\S]*?VENTAS\s+POR\s+FAMILIAS/i);
+  const txtVend=bloqueVend?bloqueVend[0]:txt.substring(0,600);
+  const vMatches=[...txtVend.matchAll(/(\d{1,2})\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][^\d$%]+?)\s+([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g)];
   const nombresVistos=new Set();
   for (const m of vMatches) {
-    const nombre=m[2].trim();
-    if (!nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|VENTAS|REPORTE|Unidad|FARMACIAS|Prom|Descripci)/i) && !nombresVistos.has(nombre) && nombre.split(' ').length>=2) {
+    const nombre=m[2].trim().replace(/\s+/g,' ');
+    if (nombre.split(' ').length>=2 && !nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|VENTAS|REPORTE|Unidad|FARMACIAS|Prom|Descripci|Otros|Premio)/i) && !nombresVistos.has(nombre)) {
       nombresVistos.add(nombre);
       d.vendedores.push({ clave:m[1]||'', nombre, otros:n(m[7]), premio:0, total:n(m[4]), tickets:parseInt(m[5]), ticket_prom:n(m[6]) });
     }
