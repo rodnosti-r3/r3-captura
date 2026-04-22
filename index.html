@@ -423,17 +423,22 @@ function parsePDF(txt, items, lineas) {
   window._pdfTxt = txt;
 
   window._lineas = lineas;
-  // Vendedores: leer renglón por renglón
+  // Vendedores: leer renglón por renglón, buscar patrón nombre + %  + $total + tickets
   d.vendedores=[];
   let enVendedores=false;
   for (const linea of lineas) {
     if (/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR/i.test(linea)) { enVendedores=true; continue; }
-    if (/Familia\s+Descripci|VENTAS\s+POR\s+FAMILIAS/i.test(linea)) { enVendedores=false; continue; }
+    if (/Familia|VENTAS\s+POR\s+FAMILIAS/i.test(linea) && enVendedores) { enVendedores=false; continue; }
     if (!enVendedores) continue;
-    // Renglón de vendedor: empieza con número seguido de nombre y tiene porcentaje
-    const vm=linea.match(/^(\d{1,2})\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+){1,5})\s+([\d,]+\.\d{2})\s+[\d.]+%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})/);
+    // Buscar renglón de vendedor: tiene porcentaje% y $monto y número de tickets
+    // Formato: [clave] nombre [otros] XX.XX% $total tickets ticketprom
+    const vm=linea.match(/(\d{1,2})\s+(.+?)\s+[\d,]*\.?\d*\s*([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})/);
     if (vm) {
-      d.vendedores.push({ clave:vm[1], nombre:vm[2].trim(), otros:n(vm[3]), premio:0, total:n(vm[4]), tickets:parseInt(vm[5]), ticket_prom:n(vm[6]) });
+      // Limpiar el nombre — quitar números del final
+      let nombre=vm[2].trim().replace(/[\d,]+\.\d+\s*$/,'').trim();
+      if (nombre.split(' ').length>=2 && !nombre.match(/^(Clave|Nombre|Total|Ticket|Prom)/i)) {
+        d.vendedores.push({ clave:vm[1], nombre, otros:0, premio:0, total:n(vm[4]), tickets:parseInt(vm[5]), ticket_prom:n(vm[6]) });
+      }
     }
   }
 
