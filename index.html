@@ -408,7 +408,7 @@ function parsePDF(txt, items) {
 
   // Vendedores: "2 Jessika Darinka Vilchis Reyes 42.41% $11,407.25 64 178.24 4,837.52"
   d.vendedores=[];
-  const vRe=/(\d+)\s+((?:[A-Za-záéíóúÁÉÍÓÚñÑ]+\s+){2,6}?)([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g;
+  const vRe=/(\d+)\s+((?:[A-Za-záéíóúÁÉÍÓÚñÑ]+\s+){2,7}?)([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g;
   let m;
   while ((m=vRe.exec(txt))!==null) {
     const nombre=m[2].trim();
@@ -455,8 +455,8 @@ function parsePDF(txt, items) {
       d.venta_neta_iva0    = allWithZero[13]||0; // $22,030.20
       d.venta_neta_iva16   = allWithZero[14]||0; // $9,819.91
       d.venta_neta_total   = allWithZero[15]||0; // $31,850.11
-      d.devoluciones       = allWithZero[2]||0;  // $3,273.36
-      d.descuentos_devoluciones = allWithZero[3]||0; // $7,279.30
+      d.devoluciones       = allWithZero[3]||0;  // $7,279.30
+      d.descuentos_devoluciones = allWithZero[2]||0; // $3,273.36
       d.total_devoluciones = allWithZero[5]||0;  // $10,552.66
       d.venta_neta_iva16b  = allWithZero[8]||0;  // $1,571.19
       d.descuentos         = 0;
