@@ -411,13 +411,11 @@ function parsePDF(txt, items) {
   const bloqueVend=txt.match(/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR([\s\S]*?)VENTAS\s+POR\s+FAMILIAS/i);
   if (bloqueVend) {
     const bv=bloqueVend[1];
-    // Encontrar todas las posiciones de XX.XX%
     const pctMatches=[...bv.matchAll(/([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g)];
+    window._pctMatches=pctMatches.map(pm=>({idx:pm.index,pct:pm[1],total:pm[2],antes:bv.substring(Math.max(0,pm.index-60),pm.index)}));
     for (const pm of pctMatches) {
-      // Buscar el nombre: texto antes del porcentaje
       const antes=bv.substring(0, pm.index);
-      // El nombre termina justo antes del porcentaje, buscar último número seguido de nombre
-      const nombreM=antes.match(/(\d{1,2})\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+){1,5})\s*$/);
+      const nombreM=antes.match(/(\d{1,2})\s+([A-ZÁÉÍÓÚÑJa-záéíóúñ][a-záéíóúñA-ZÁÉÍÓÚÑj]+(?:\s+[A-ZÁÉÍÓÚÑJa-záéíóúñ][a-záéíóúñA-ZÁÉÍÓÚÑ]+){1,5})\s*$/);
       if (nombreM) {
         const nombre=nombreM[2].trim();
         if (nombre.split(' ').length>=2) {
