@@ -372,14 +372,30 @@ async function loadPDF(input) {
   document.getElementById('dropzone').classList.add('loaded');
   const ab=await file.arrayBuffer();
   const pdf=await pdfjsLib.getDocument({data:ab}).promise;
-  let items=[];
+  let allItems=[];
+  let lineas=[];
   for (let i=1;i<=pdf.numPages;i++) {
     const pg=await pdf.getPage(i);
     const tc=await pg.getTextContent();
-    items=items.concat(tc.items.map(x=>x.str.trim()).filter(x=>x.length>0));
+    // Agrupar items por renglón usando posición Y
+    const pageItems=tc.items.filter(x=>x.str.trim().length>0);
+    allItems=allItems.concat(pageItems.map(x=>x.str.trim()));
+    // Agrupar por coordenada Y (renglón)
+    const rows={};
+    for (const item of pageItems) {
+      const y=Math.round(item.transform[5]);
+      if (!rows[y]) rows[y]=[];
+      rows[y].push({x:item.transform[4], str:item.str.trim()});
+    }
+    // Ordenar renglones de arriba a abajo y dentro de cada renglón de izq a der
+    const sortedY=Object.keys(rows).map(Number).sort((a,b)=>b-a);
+    for (const y of sortedY) {
+      const renglon=rows[y].sort((a,b)=>a.x-b.x).map(i=>i.str).join(' ');
+      lineas.push(renglon);
+    }
   }
-  const txt=items.join(' ');
-  extractedData=parsePDF(txt, items);
+  const txt=allItems.join(' ');
+  extractedData=parsePDF(txt, allItems, lineas);
   mostrarPreview(extractedData);
   document.getElementById('submitBtn').disabled=!extractedData.venta_neta_iva;
 }
@@ -387,7 +403,7 @@ async function loadPDF(input) {
 function n(s){ return parseFloat((s||'0').toString().replace(/,/g,'')); }
 function fmt(v){ if(!v&&v!==0) return '—'; return '$'+Number(v).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
-function parsePDF(txt, items) {
+function parsePDF(txt, items, lineas) {
   const d={};
 
   // Fecha
@@ -406,43 +422,17 @@ function parsePDF(txt, items) {
   // Vendedores — buscar filas con patrón: clave nombre otros% premio $total tickets ticketprom
   window._pdfTxt = txt;
 
-  // Vendedores: leer por items individuales del PDF (no texto corrido)
+  // Vendedores: leer renglón por renglón
   d.vendedores=[];
-  // El PDF tiene cada valor separado - buscar por posición en el array de items
-  // Formato por item: [clave, nombre(s), otros, porcentaje, total, tickets, ticket_prom]
-  // Buscar en items[] en lugar de txt
-  const iVend=items.findIndex(i=>/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR/i.test(i));
-  const iFam=items.findIndex(i=>/Familia\s+Descripci/i.test(i) || /VENTAS\s+POR\s+FAMILIAS/i.test(i));
-  if (iVend>=0 && iFam>iVend) {
-    const vendItems=items.slice(iVend+1, iFam);
-    // Cada vendedor tiene: clave(1) nombre(varios) otros(1) porcentaje%(1) $total(1) tickets(1) ticketprom(1)
-    // Identificar filas de vendedor: item que es un número pequeño (clave)
-    let i=0;
-    while (i<vendItems.length) {
-      const item=vendItems[i];
-      // Clave: número 1-99 solo
-      if (/^\d{1,2}$/.test(item.trim())) {
-        const clave=item.trim();
-        // Recoger nombre (palabras con mayúscula)
-        let nombre=''; let j=i+1;
-        while (j<vendItems.length && /^[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+$/.test(vendItems[j].trim())) {
-          nombre+=(nombre?' ':'')+vendItems[j].trim(); j++;
-        }
-        // Siguiente: otros (número con decimales)
-        const otros=n(vendItems[j]); j++;
-        // Siguiente: porcentaje (puede incluir %)
-        j++; // skip porcentaje
-        // Siguiente: $total
-        const total=n((vendItems[j]||'').replace('$','')); j++;
-        // Siguiente: tickets
-        const tickets=parseInt(vendItems[j]||'0'); j++;
-        // Siguiente: ticket_prom
-        const ticket_prom=n(vendItems[j]||'0'); j++;
-        if (nombre && nombre.split(' ').length>=2) {
-          d.vendedores.push({ clave, nombre, otros, premio:0, total, tickets, ticket_prom });
-        }
-        i=j;
-      } else { i++; }
+  let enVendedores=false;
+  for (const linea of lineas) {
+    if (/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR/i.test(linea)) { enVendedores=true; continue; }
+    if (/Familia\s+Descripci|VENTAS\s+POR\s+FAMILIAS/i.test(linea)) { enVendedores=false; continue; }
+    if (!enVendedores) continue;
+    // Renglón de vendedor: empieza con número seguido de nombre y tiene porcentaje
+    const vm=linea.match(/^(\d{1,2})\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+){1,5})\s+([\d,]+\.\d{2})\s+[\d.]+%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})/);
+    if (vm) {
+      d.vendedores.push({ clave:vm[1], nombre:vm[2].trim(), otros:n(vm[3]), premio:0, total:n(vm[4]), tickets:parseInt(vm[5]), ticket_prom:n(vm[6]) });
     }
   }
 
