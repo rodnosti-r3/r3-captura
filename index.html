@@ -449,23 +449,22 @@ function parsePDF(txt, items) {
     // Filtramos los ceros y tomamos los valores significativos
     const allWithZero=[...bloque.matchAll(/\$([\d,]+\.\d{2})/g)].map(x=>n(x[1]));
     if (allWithZero.length>=16) {
-      d.venta_bruta_iva0   = allWithZero[10]||0; // $29,309.50
-      d.venta_bruta_iva16  = allWithZero[11]||0; // $13,093.27
-      d.venta_bruta_total  = allWithZero[12]||0; // $42,402.77
-      d.venta_neta_iva0    = allWithZero[13]||0; // $22,030.20
-      d.venta_neta_iva16   = allWithZero[14]||0; // $9,819.91
-      d.venta_neta_total   = allWithZero[15]||0; // $31,850.11
-      d.devoluciones       = allWithZero[3]||0;  // $7,279.30
-      d.descuentos_devoluciones = allWithZero[2]||0; // $3,273.36
-      d.total_devoluciones = allWithZero[5]||0;  // $10,552.66
-      d.venta_neta_iva16b  = allWithZero[8]||0;  // $1,571.19
-      d.descuentos         = 0;
+      d.descuentos_devoluciones = allWithZero[5]||0;  // $3,273.36
+      d.devoluciones            = allWithZero[6]||0;  // $7,279.30
+      d.total_devoluciones      = allWithZero[8]||0;  // $10,552.66
+      d.venta_bruta_iva0        = allWithZero[13]||0; // $29,309.50
+      d.venta_bruta_iva16       = allWithZero[14]||0; // $13,093.27
+      d.venta_bruta_total       = allWithZero[15]||0; // $42,402.77
+      d.venta_neta_iva0         = allWithZero[16]||0; // $22,030.20
+      d.venta_neta_iva16        = allWithZero[17]||0; // $9,819.91
+      d.venta_neta_total        = allWithZero[18]||0; // $31,850.11
+      d.descuentos              = 0;
     } else {
       d.venta_bruta_iva0=0; d.venta_bruta_iva16=0; d.venta_bruta_total=0;
       d.descuentos=0; d.devoluciones=0; d.descuentos_devoluciones=0; d.total_devoluciones=0;
       d.venta_neta_iva0=0; d.venta_neta_iva16=0; d.venta_neta_total=0;
     }
-    d.iva = d.venta_neta_iva - (d.venta_neta_total||0);
+    d.iva = d.venta_neta_iva16||0;
   } else {
     d.venta_bruta_iva0=0; d.venta_bruta_iva16=0; d.venta_bruta_total=0;
     d.descuentos=0; d.devoluciones=0; d.descuentos_devoluciones=0; d.total_devoluciones=0;
@@ -474,16 +473,20 @@ function parsePDF(txt, items) {
 
   window._pdfTxt = txt;
 
-  // Tickets - formato real: números después de las etiquetas
-  const tEmit=txt.match(/Tickets\s+Emitidos\s+(\d+)/i); d.tickets_emitidos=tEmit?parseInt(tEmit[1]):0;
-  const tVef=txt.match(/Tickets\s+Venta\s+Efectiva\s+(\d+)/i); d.tickets_venta_efectiva=tVef?parseInt(tVef[1]):0;
-  const tDia=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+del\s+mismo\s+d[ií]a\)\s+(\d+)/i); d.tickets_devueltos_dia=tDia?parseInt(tDia[1]):0;
-  const tPrev=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+de\s+d[ií]as\s+previos\)\s+(\d+)/i); d.tickets_devueltos_previos=tPrev?parseInt(tPrev[1]):0;
-  const tCanc=txt.match(/Tickets\s+Cancelados\s+(\d+)/i); d.tickets_cancelados=tCanc?parseInt(tCanc[1]):0;
-  // Fallback: buscar bloque de tickets "X 170 170 X X X"
-  if (!d.tickets_emitidos) {
-    const tkBloque=txt.match(/Tickets\s+(?:Emitidos|Y\s+DEVOLUCIONES)[\s\S]{0,300}?(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i);
-    if (tkBloque) { d.tickets_devueltos_dia=parseInt(tkBloque[1]); d.tickets_emitidos=parseInt(tkBloque[2]); d.tickets_venta_efectiva=parseInt(tkBloque[3]); d.tickets_cancelados=parseInt(tkBloque[4]); d.tickets_devueltos_previos=parseInt(tkBloque[5]); }
+  // Tickets — formato real en PDF: "0 170 170 0 0 0" después de las etiquetas
+  const tkBloque=txt.match(/Tickets\s+(?:Emitidos|Y\s+DEVOLUCIONES)[\s\S]{0,500}?(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i);
+  if (tkBloque) {
+    d.tickets_devueltos_dia      = parseInt(tkBloque[1])||0;
+    d.tickets_emitidos           = parseInt(tkBloque[2])||0;
+    d.tickets_venta_efectiva     = parseInt(tkBloque[3])||0;
+    d.tickets_cancelados         = parseInt(tkBloque[4])||0;
+    d.tickets_devueltos_previos  = parseInt(tkBloque[5])||0;
+  } else {
+    const tEmit=txt.match(/Tickets\s+Emitidos\s+(\d+)/i); d.tickets_emitidos=tEmit?parseInt(tEmit[1]):0;
+    const tVef=txt.match(/Tickets\s+Venta\s+Efectiva\s+(\d+)/i); d.tickets_venta_efectiva=tVef?parseInt(tVef[1]):0;
+    const tDia=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+del\s+mismo\s+d[ií]a\)\s+(\d+)/i); d.tickets_devueltos_dia=tDia?parseInt(tDia[1]):0;
+    const tPrev=txt.match(/Tickets\s+Devueltos\s+\(Venta\s+de\s+d[ií]as\s+previos\)\s+(\d+)/i); d.tickets_devueltos_previos=tPrev?parseInt(tPrev[1]):0;
+    const tCanc=txt.match(/Tickets\s+Cancelados\s+(\d+)/i); d.tickets_cancelados=tCanc?parseInt(tCanc[1]):0;
   }
 
   return d;
