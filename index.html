@@ -407,13 +407,14 @@ function parsePDF(txt, items) {
   window._pdfTxt = txt;
 
   // Vendedores: "10 Sandra Urbina Gonzalez 40.94% $11,136.43 52 214.16 4,559.31"
+  // La clave puede estar separada del nombre en el texto
   d.vendedores=[];
-  const vRe=/\b(\d{1,2})\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+){1,4})\s+([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g;
+  const vRe=/(?:(\d{1,2})\s+)?([A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+){1,4})\s+([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g;
   let m;
   while ((m=vRe.exec(txt))!==null) {
     const nombre=m[2].trim();
     if (!nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|VENTAS|REPORTE|Unidad|FARMACIAS|Prom|Descripci)/i)) {
-      d.vendedores.push({ clave:m[1], nombre, otros:n(m[7]), premio:0, total:n(m[4]), tickets:parseInt(m[5]), ticket_prom:n(m[6]) });
+      d.vendedores.push({ clave:m[1]||'', nombre, otros:n(m[7]), premio:0, total:n(m[4]), tickets:parseInt(m[5]), ticket_prom:n(m[6]) });
     }
   }
 
