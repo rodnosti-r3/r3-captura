@@ -473,21 +473,19 @@ function parsePDF(txt, items) {
 
   window._pdfTxt = txt;
 
-  // Tickets — en el texto real aparecen como: "0 170 170 0 0 0 Tickets Por Diferencia"
-  // Buscar la secuencia de 6 números después de los totales de vendedores
-  const tkM=txt.match(/\$196[\s\S]{0,50}?(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i)
-    || txt.match(/Tickets\s+(?:Emitidos|Y\s+DEVOLUCIONES|Venta\s+Efectiva)[\s\S]{0,400}?(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i);
+  // Tickets — texto real: "Venta Efectiva 0 170 170 0 0 Tickets Por Diferencia 0"
+  // Orden: venta_efectiva, devueltos_dia, emitidos, cancelados, devueltos_previos
+  const tkM=txt.match(/Venta\s+Efectiva\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/i);
   if (tkM) {
-    d.tickets_devueltos_dia     = parseInt(tkM[1])||0;
-    d.tickets_emitidos          = parseInt(tkM[2])||0;
-    d.tickets_venta_efectiva    = parseInt(tkM[3])||0;
+    d.tickets_venta_efectiva    = parseInt(tkM[1])||0;
+    d.tickets_devueltos_dia     = parseInt(tkM[2])||0;
+    d.tickets_emitidos          = parseInt(tkM[3])||0;
     d.tickets_cancelados        = parseInt(tkM[4])||0;
     d.tickets_devueltos_previos = parseInt(tkM[5])||0;
   } else {
     d.tickets_emitidos=0; d.tickets_venta_efectiva=0;
     d.tickets_devueltos_dia=0; d.tickets_devueltos_previos=0; d.tickets_cancelados=0;
   }
-  window._tkNums = tkM ? [tkM[1],tkM[2],tkM[3],tkM[4],tkM[5],tkM[6]] : [];
 
   return d;
 }
