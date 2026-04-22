@@ -423,22 +423,19 @@ function parsePDF(txt, items, lineas) {
   window._pdfTxt = txt;
 
   window._lineas = lineas;
-  // Vendedores: leer renglón por renglón, buscar patrón nombre + %  + $total + tickets
+  // Vendedores: buscar por nombre exacto en el texto
   d.vendedores=[];
-  let enVendedores=false;
-  for (const linea of lineas) {
-    if (/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR/i.test(linea)) { enVendedores=true; continue; }
-    if (/Familia|VENTAS\s+POR\s+FAMILIAS/i.test(linea) && enVendedores) { enVendedores=false; continue; }
-    if (!enVendedores) continue;
-    // Buscar renglón de vendedor: tiene porcentaje% y $monto y número de tickets
-    // Formato: [clave] nombre [otros] XX.XX% $total tickets ticketprom
-    const vm=linea.match(/(\d{1,2})\s+(.+?)\s+[\d,]*\.?\d*\s*([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})/);
-    if (vm) {
-      // Limpiar el nombre — quitar números del final
-      let nombre=vm[2].trim().replace(/[\d,]+\.\d+\s*$/,'').trim();
-      if (nombre.split(' ').length>=2 && !nombre.match(/^(Clave|Nombre|Total|Ticket|Prom)/i)) {
-        d.vendedores.push({ clave:vm[1], nombre, otros:0, premio:0, total:n(vm[4]), tickets:parseInt(vm[5]), ticket_prom:n(vm[6]) });
-      }
+  const VENDEDORAS = [
+    'Sandra Urbina Gonzalez',
+    'Karla Deyaneira Granados Alberto',
+    'Jessika Darinka Vilchis Reyes',
+  ];
+  for (const nombre of VENDEDORAS) {
+    // Buscar nombre en el texto y extraer números que siguen
+    const re = new RegExp(nombre + '\\s+([\\d,]+\\.\\d{2})\\s+[\\d.]+%\\s+([\\d,]+\\.\\d{2})\\s+\\$([\\d,]+\\.\\d{2})\\s+(\\d+)\\s+([\\d,]+\\.\\d{2})', 'i');
+    const m = txt.match(re);
+    if (m) {
+      d.vendedores.push({ clave:'', nombre, otros:n(m[2]), premio:n(m[1]), total:n(m[3]), tickets:parseInt(m[4]), ticket_prom:n(m[5]) });
     }
   }
 
