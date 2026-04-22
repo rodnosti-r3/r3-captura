@@ -406,21 +406,21 @@ function parsePDF(txt, items) {
   // Vendedores — buscar filas con patrón: clave nombre otros% premio $total tickets ticketprom
   window._pdfTxt = txt;
 
-  // Vendedores: usar porcentajes como anclas para encontrar cada registro
+  // Vendedores: usar porcentajes como anclas, buscar nombre hacia atrás
   d.vendedores=[];
   const bloqueVend=txt.match(/VENTAS\s+DE\s+PRODUCTOS\s+POR\s+VENDEDOR([\s\S]*?)VENTAS\s+POR\s+FAMILIAS/i);
   if (bloqueVend) {
     const bv=bloqueVend[1];
     const pctMatches=[...bv.matchAll(/([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g)];
-    window._pctMatches=pctMatches.map(pm=>({idx:pm.index,pct:pm[1],total:pm[2],antes:bv.substring(Math.max(0,pm.index-60),pm.index)}));
+    window._pctMatches=pctMatches.map(pm=>({antes:bv.substring(Math.max(0,pm.index-80),pm.index)}));
     for (const pm of pctMatches) {
       const antes=bv.substring(0, pm.index);
-      const nombreM=antes.match(/(\d{1,2})\s+([A-ZÁÉÍÓÚÑJa-záéíóúñ][a-záéíóúñA-ZÁÉÍÓÚÑj]+(?:\s+[A-ZÁÉÍÓÚÑJa-záéíóúñ][a-záéíóúñA-ZÁÉÍÓÚÑ]+){1,5})\s*$/);
+      // Buscar secuencia: clave + nombre (palabras con mayúscula) al final del texto anterior
+      // Ignorar números decimales intermedios
+      const nombreM=antes.match(/\b(\d{1,2})\s+((?:[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+\s+){2,5}[A-ZÁÉÍÓÚÑ][a-záéíóúñA-ZÁÉÍÓÚÑ]+)\s*$/);
       if (nombreM) {
         const nombre=nombreM[2].trim();
-        if (nombre.split(' ').length>=2) {
-          d.vendedores.push({ clave:nombreM[1], nombre, otros:n(pm[5]), premio:0, total:n(pm[2]), tickets:parseInt(pm[3]), ticket_prom:n(pm[4]) });
-        }
+        d.vendedores.push({ clave:nombreM[1], nombre, otros:n(pm[5]), premio:0, total:n(pm[2]), tickets:parseInt(pm[3]), ticket_prom:n(pm[4]) });
       }
     }
   }
