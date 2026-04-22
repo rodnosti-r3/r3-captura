@@ -406,40 +406,22 @@ function parsePDF(txt, items) {
   // Vendedores — buscar filas con patrón: clave nombre otros% premio $total tickets ticketprom
   window._pdfTxt = txt;
 
-  // Vendedores: clave nombre XX.XX% $total tickets ticketprom otros
-  // Formato real: "10 Sandra Urbina Gonzalez 40.94% $11,136.43 52 214.16 4,559.31"
+  // Vendedores: "2 Jessika Darinka Vilchis Reyes 42.41% $11,407.25 64 178.24 4,837.52"
   d.vendedores=[];
-  const vRe=/(\d+)\s+((?:[A-Za-záéíóúÁÉÍÓÚñÑ]+\s+){2,5})([\d.]+)%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g;
+  const vRe=/(\d+)\s+((?:[A-Za-záéíóúÁÉÍÓÚñÑ]+\s+){2,6}?)([\d]+\.\d{2})%\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})/g;
   let m;
   while ((m=vRe.exec(txt))!==null) {
     const nombre=m[2].trim();
-    if (nombre.length>3 && !nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|VENTAS|REPORTE|Unidad)/i)) {
+    if (nombre.length>3 && !nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|VENTAS|REPORTE|Unidad|FARMACIAS)/i)) {
       d.vendedores.push({ clave:m[1], nombre, otros:n(m[7]), premio:0, total:n(m[4]), tickets:parseInt(m[5]), ticket_prom:n(m[6]) });
     }
   }
 
-  // Si no encontró vendedores con ese formato, intentar formato alternativo
-  if (d.vendedores.length===0) {
-    const vRe2=/(\d+)\s+((?:[A-Za-záéíóúÁÉÍÓÚñÑ]+\s+){2,5})([\d,]+\.\d{2})\s+[\d.]+%\s+([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+(\d+)\s+([\d,]+\.\d{2})/g;
-    while ((m=vRe2.exec(txt))!==null) {
-      const nombre=m[2].trim();
-      if (nombre.length>3 && !nombre.match(/^(Familia|Venta|Total|Ticket|Clave|Nombre|VENTAS|REPORTE|Unidad)/i)) {
-        d.vendedores.push({ clave:m[1], nombre, otros:n(m[3]), premio:n(m[4]), total:n(m[5]), tickets:parseInt(m[6]), ticket_prom:n(m[7]) });
-      }
-    }
-  }
-
-  // Totales vendedores
+  // Totales: "$14,362.61 42.97% $19,058.73 $33,421.34 170 $196.60"
   const tRe=/\$([\d,]+\.\d{2})\s+[\d.]+%\s+\$([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+(\d+)\s+\$([\d,]+\.\d{2})/;
   const tm=txt.match(tRe);
   if (tm) { d.total_otros=n(tm[1]); d.total_premio=n(tm[2]); d.total_general=n(tm[3]); d.total_tickets=parseInt(tm[4]); d.total_ticket_prom=n(tm[5]); }
-  else {
-    // Formato alternativo del total: buscar la línea con el total de todos los vendedores
-    const tRe2=/([\d,]+\.\d{2})\s+[\d.]+%\s+([\d,]+\.\d{2})\s+\$([\d,]+\.\d{2})\s+(\d+)\s+\$([\d,]+\.\d{2})/;
-    const tm2=txt.match(tRe2);
-    if (tm2) { d.total_otros=n(tm2[1]); d.total_premio=n(tm2[2]); d.total_general=n(tm2[3]); d.total_tickets=parseInt(tm2[4]); d.total_ticket_prom=n(tm2[5]); }
-    else { d.total_otros=0; d.total_premio=0; d.total_general=0; d.total_tickets=0; d.total_ticket_prom=0; }
-  }
+  else { d.total_otros=0; d.total_premio=0; d.total_general=0; d.total_tickets=0; d.total_ticket_prom=0; }
 
   // Familias - formato real: "01 MEDICAMENTOS 21,315.34"
   const famPatterns=[
@@ -455,24 +437,35 @@ function parsePDF(txt, items) {
     d[key]=fm?n(fm[1]):0;
   }
 
-  // Resumen ventas — extraer los 6 números de IVA 0%, IVA 16%, Total en orden
-  // Venta Bruta: $IVA0 $IVA16 $Total
+  // Resumen ventas — extraer todos los números del bloque entre Venta Bruta y Venta Neta+Iva
   const bloqueM=txt.match(/Venta\s+Bruta[\s\S]*?Venta\s+Neta\s*\+\s*Iva/i);
   if (bloqueM) {
     const bloque=bloqueM[0];
-    const allNums=[...bloque.matchAll(/\$([\d,]+\.\d{2})/g)].map(x=>n(x[1]));
-    // Orden típico: [VB_0, VB_16, VB_total, desc_0, desc_16, dev_0, dev_16, totDev_0, totDev_16, totDev_total, VN_0, VN_16, VN_total, venta_neta_iva]
-    d.venta_bruta_iva0   = allNums[0]||0;
-    d.venta_bruta_iva16  = allNums[1]||0;
-    d.venta_bruta_total  = allNums[2]||0;
-    d.descuentos         = allNums[3]||0;
-    d.devoluciones       = allNums[6]||0;
-    d.descuentos_devoluciones = allNums[7]||0;
-    d.total_devoluciones = allNums[9]||0;
-    d.venta_neta_iva0    = allNums[10]||0;
-    d.venta_neta_iva16   = allNums[11]||0;
-    d.venta_neta_total   = allNums[12]||0;
-    d.iva = d.venta_neta_iva - d.venta_neta_total;
+    // Extraer todos los números (con o sin $)
+    const allNums=[...bloque.matchAll(/[\$]?([\d,]+\.\d{2})/g)]
+      .map(x=>n(x[1]))
+      .filter(x=>x>0);
+    // El texto real tiene: $0 $0 $3273.36 $7279.30 $0 $10552.66 $0 $0 $1571.19 $0 $29309.50 $13093.27 $42402.77 $22030.20 $9819.91 $31850.11 $33421.30
+    // Filtramos los ceros y tomamos los valores significativos
+    const allWithZero=[...bloque.matchAll(/\$([\d,]+\.\d{2})/g)].map(x=>n(x[1]));
+    if (allWithZero.length>=16) {
+      d.venta_bruta_iva0   = allWithZero[10]||0; // $29,309.50
+      d.venta_bruta_iva16  = allWithZero[11]||0; // $13,093.27
+      d.venta_bruta_total  = allWithZero[12]||0; // $42,402.77
+      d.venta_neta_iva0    = allWithZero[13]||0; // $22,030.20
+      d.venta_neta_iva16   = allWithZero[14]||0; // $9,819.91
+      d.venta_neta_total   = allWithZero[15]||0; // $31,850.11
+      d.devoluciones       = allWithZero[2]||0;  // $3,273.36
+      d.descuentos_devoluciones = allWithZero[3]||0; // $7,279.30
+      d.total_devoluciones = allWithZero[5]||0;  // $10,552.66
+      d.venta_neta_iva16b  = allWithZero[8]||0;  // $1,571.19
+      d.descuentos         = 0;
+    } else {
+      d.venta_bruta_iva0=0; d.venta_bruta_iva16=0; d.venta_bruta_total=0;
+      d.descuentos=0; d.devoluciones=0; d.descuentos_devoluciones=0; d.total_devoluciones=0;
+      d.venta_neta_iva0=0; d.venta_neta_iva16=0; d.venta_neta_total=0;
+    }
+    d.iva = d.venta_neta_iva - (d.venta_neta_total||0);
   } else {
     d.venta_bruta_iva0=0; d.venta_bruta_iva16=0; d.venta_bruta_total=0;
     d.descuentos=0; d.devoluciones=0; d.descuentos_devoluciones=0; d.total_devoluciones=0;
